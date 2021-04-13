@@ -91,16 +91,15 @@ async def show_regulations(context):
     await context.channel.purge(limit=10)
     list_of_rules = session.query(Rules).all()
 
-    i = 1
-    while i < len(list_of_rules):
+
+    start_from = 0
+    while start_from < len(list_of_rules):
         embed = discord.Embed(title="Regulamin")
-        for elem in list_of_rules[i - 1:]:
+        for elem in list_of_rules[start_from:start_from + 25]:
             text = str(elem.Position) + ". " + elem.Text
             embed.add_field(name='\u200b', value=text, inline=False)
-            i += 1
-            if i % 26 == 0:
-                break
         await context.send(embed=embed)
+        start_from += 25
 
 
 bot.run(TOKEN)
