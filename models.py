@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, INTEGER, DATETIME, VARCHAR
+from sqlalchemy import Column, String, INTEGER, DATETIME, VARCHAR, BIGINT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
@@ -18,6 +18,20 @@ class Rules(Base):
         self.Author = author
         self.Position = position
 
+class RulesActions(Base):
+    __tablename__ = 'RulesActions'
+    Id = Column('Id', INTEGER, primary_key=True)
+    MessageId = Column('MessageId', BIGINT, nullable=False)
+    Action = Column('Action', VARCHAR(50), nullable=False)
+    Author = Column('Author', VARCHAR(50))
+    Text = Column('Text', VARCHAR(100))
+
+
+    def __init__(self, mid, a, aut, t):
+        self.MessageId = mid
+        self.Action = a
+        self.Author = aut
+        self.Text = t
 
 class Configuration(Base):
     __tablename__ = 'Configuration'
