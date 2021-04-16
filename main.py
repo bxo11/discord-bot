@@ -1,12 +1,19 @@
 import os
-
+import logging
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+
 import db
 from sqlalchemy.orm import sessionmaker
 
-from models import Configuration, Rules
+import models
+
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -23,42 +30,44 @@ global rules_channel
 @bot.event
 async def on_ready():
     global rules_channel
-    rules_channel = session.query(Configuration).filter(
-        Configuration.SettingName == 'RulesChannel').first().SettingValue
+    rules_channel = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'RulesChannel').first().SettingValue
     print('Logged in as:')
     print('Username: ' + bot.user.name)
     print('------')
 
 
 @bot.command(name='radd', help='Adding new rule')
-async def rule_add(context, mess):
+async def rule_add(ctx: commands.Context, mess: str):
     global rules_channel
-    if rules_channel != context.channel.name:
+    if rules_channel != ctx.channel.name:
         print("Wrong channel")
         return
 
-    current_position = session.query(Configuration).filter(Configuration.SettingName == 'CurrentRulePosition').first()
-    rule = Rules(mess, context.message.author.name + '#' + context.message.author.discriminator,
-                 current_position.SettingValue)
+    current_position: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'CurrentRulePosition').first()
+    rule: models.Rules = models.Rules(mess, ctx.message.author.name + '#' + ctx.message.author.discriminator,
+                                      current_position.SettingValue)
     session.add(rule)
     current_position.SettingValue = int(current_position.SettingValue) + 1
     session.commit()
     print("Rule added")
-    await show_regulations(context)
+    await show_regulations(ctx)
 
 
 @bot.command(name='rdel', help='')
-async def rule_delete(context, position):
+async def rule_delete(ctx: commands.Context, position: int):
     global rules_channel
-    if rules_channel != context.channel.name:
+    if rules_channel != ctx.channel.name:
         print("Wrong channel")
         return
 
-    current_position = session.query(Configuration).filter(Configuration.SettingName == 'CurrentRulePosition').first()
-    rule_to_delete = session.query(Rules).filter(Rules.Position == position).first()
+    current_position: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'CurrentRulePosition').first()
+    rule_to_delete: models.Rules = session.query(models.Rules).filter(models.Rules.Position == position).first()
 
     if rule_to_delete is None:
-        await context.send('Wrong position')
+        await ctx.send('Wrong position')
         return
 
     session.delete(rule_to_delete)
@@ -66,40 +75,49 @@ async def rule_delete(context, position):
     session.commit()
     print('Rule deleted')
     recalculate_positions()
-    await show_regulations(context)
+    await show_regulations(ctx)
 
 
 def recalculate_positions():
-    list_of_rules = session.query(Rules).all()
-    temp = 1
+    list_of_rules: list = session.query(models.Rules).all()
+    temp: int = 1
     for elem in list_of_rules:
         elem.Position = temp
         temp += 1
 
-    current_position = session.query(Configuration).filter(Configuration.SettingName == 'CurrentRulePosition').first()
+    current_position: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'CurrentRulePosition').first()
     current_position.SettingValue = temp
     session.commit()
 
 
 @bot.command(name='rshow', help='')
-async def show_regulations(context):
+async def show_regulations(ctx: commands.Context):
     global rules_channel
-    if rules_channel != context.channel.name:
+    if rules_channel != ctx.channel.name:
         print("Wrong channel")
         return
 
-    await context.channel.purge(limit=10)
-    list_of_rules = session.query(Rules).all()
+    amount_of_fields_in_embed = 5
+    amount_of_rules_in_embed_field = 20
+    await ctx.channel.purge(limit=10)
+    list_of_rules: list = session.query(models.Rules).all()
 
-
-    start_from = 0
-    while start_from < len(list_of_rules):
+    position = 0
+    while position < len(list_of_rules):
         embed = discord.Embed(title="Regulamin")
-        for elem in list_of_rules[start_from:start_from + 25]:
-            text = str(elem.Position) + ". " + elem.Text
+        for i in range(amount_of_fields_in_embed):
+            if position >= len(list_of_rules):
+                break
+            text = ""
+            for j in range(amount_of_rules_in_embed_field):
+                if position >= len(list_of_rules):
+                    break
+                elem: models.Rules = list_of_rules[position]
+                text += str(elem.Position) + ". " + elem.Text + "\n"
+                position += 1
             embed.add_field(name='\u200b', value=text, inline=False)
-        await context.send(embed=embed)
-        start_from += 25
+        await ctx.send(embed=embed)
 
 
 bot.run(TOKEN)
