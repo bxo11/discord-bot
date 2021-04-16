@@ -3,8 +3,9 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
 load_dotenv()
-DB_URI = os.getenv('DB_URI')
+DATABASE_URL = os.getenv('DATABASE_URL')
+
 
 def load_database():
-    engine = create_engine(DB_URI, echo=True)
+    engine = create_engine(DATABASE_URL, echo=True)
     return engine
