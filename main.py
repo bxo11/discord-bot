@@ -223,13 +223,15 @@ async def show_reg(channel: discord.Message.channel):
 
 @bot.command(name='help')
 async def show_help(ctx: commands.Context):
-    desc = "Komendy dzialaja tylko na " + "'" + get_rules_action_channel() + "'"
+    desc = get_rules_action_channel()
     embed = discord.Embed(description="Komendy dzialaja tylko na " + "'" + desc + "'", color=0xff0000)
     embed.add_field(name=".add", value="Dodaj punkt do regulaminu (np: **.add 'wojtek to gej'**)", inline=False)
     embed.add_field(name=".del", value="Usuń punkt z regulaminu (np: **.del 12**)", inline=False)
     embed.add_field(name=".adminadd", value="Natychmiast dodaj punkt (**tylko admin**)", inline=False)
     embed.add_field(name=".admindel", value="Natychmiast usuń punkt (**tylko admin**)", inline=False)
     embed.add_field(name=".show", value="Pokaż regulamin", inline=True)
+    embed.add_field(name=".help", value="Pokaż komendy", inline=True)
+    embed.set_footer(text="Po dodaniu nowego punktu poczekaj aż Ojciec go zatwierdzi")
     await ctx.send(embed=embed)
 
 
