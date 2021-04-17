@@ -24,18 +24,9 @@ engine = db.load_database()
 Session = sessionmaker(bind=engine)
 session = Session()
 
-global rules_channel
-global rules_action_channel
-
 
 @bot.event
 async def on_ready():
-    global rules_channel
-    global rules_action_channel
-    rules_channel = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'RulesChannel').first().SettingValue
-    rules_action_channel = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'RulesActionChannel').first().SettingValue
     print('Logged in as:')
     print('Username: ' + bot.user.name)
     print('------')
@@ -43,33 +34,33 @@ async def on_ready():
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
-    if not payload.member.guild_permissions:
+    if not payload.member.guild_permissions.administrator:
         return
-    mess_id = payload.message_id
+    mess_id: int = payload.message_id
     action: models.RulesActions = session.query(models.RulesActions).filter(
         models.RulesActions.MessageId == mess_id).first()
 
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
     if action.Action == "add":
-        rule: models.Rules = models.Rules(action.Text, payload.member.name + '#' + payload.member.discriminator,
-                                          current_position.SettingValue)
+        rule: models.Rules = models.Rules(action.Text, str(payload.member), get_current_position())
         session.add(rule)
-        current_position.SettingValue = int(current_position.SettingValue) + 1
-    if action.Action == "delete":
+        change_current_position('+', 1)
+
+    elif action.Action == "delete":
         try:
             rule_to_delete: models.Rules = session.query(models.Rules).filter(
                 models.Rules.Position == action.Text).first()
             if rule_to_delete is None:
                 channel = payload.channel_id
+                session.delete(action)
                 await channel.send('Wrong position')
                 return
             session.delete(rule_to_delete)
-            current_position.SettingValue = int(current_position.SettingValue) - 1
+            change_current_position('-', 1)
             recalculate_positions()
         except:
             session.rollback()
-            print("Type Error")
+            channel = payload.channel_id
+            await channel.send('Wrong position type')
 
     session.delete(action)
     session.commit()
@@ -77,14 +68,12 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 
 @bot.command(name='radd', help='Adding new rule')
 async def rule_add(ctx: commands.Context, mess: str):
-    global rules_action_channel
+    rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        print("Wrong channel")
+        await ctx.send("Wrong channel, use this command on " + rules_action_channel + " channel")
         return
 
-    action: models.RulesActions = models.RulesActions(ctx.message.id, "add",
-                                                      ctx.message.author.name + '#' + ctx.message.author.discriminator,
-                                                      mess)
+    action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
     print("Rule action added")
@@ -92,14 +81,12 @@ async def rule_add(ctx: commands.Context, mess: str):
 
 @bot.command(name='rdel', help='Adding new rule')
 async def rule_delete(ctx: commands.Context, mess: str):
-    global rules_action_channel
+    rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        print("Wrong channel")
+        await ctx.send("Wrong channel, use this command on " + rules_action_channel + " channel")
         return
 
-    action: models.RulesActions = models.RulesActions(ctx.message.id, "delete",
-                                                      ctx.message.author.name + '#' + ctx.message.author.discriminator,
-                                                      mess)
+    action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
     print("Rule action added")
@@ -108,17 +95,14 @@ async def rule_delete(ctx: commands.Context, mess: str):
 @bot.command(name='raddnow', help='Adding new rule')
 @commands.has_permissions(administrator=True)
 async def rule_add_now(ctx: commands.Context, mess: str):
-    global rules_channel
+    rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        print("Wrong channel")
+        await ctx.send("Wrong channel, use this command on " + rules_channel + " channel")
         return
 
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
-    rule: models.Rules = models.Rules(mess, ctx.message.author.name + '#' + ctx.message.author.discriminator,
-                                      current_position.SettingValue)
+    rule: models.Rules = models.Rules(mess, str(ctx.message.author), get_current_position())
     session.add(rule)
-    current_position.SettingValue = int(current_position.SettingValue) + 1
+    change_current_position('+', 1)
     session.commit()
     print("Rule added")
     await show_regulations(ctx)
@@ -127,13 +111,11 @@ async def rule_add_now(ctx: commands.Context, mess: str):
 @bot.command(name='rdelnow', help='')
 @commands.has_permissions(administrator=True)
 async def rule_delete_now(ctx: commands.Context, position: int):
-    global rules_channel
+    rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        print("Wrong channel")
+        await ctx.send("Wrong channel, use this command on " + rules_channel + " channel")
         return
 
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
     rule_to_delete: models.Rules = session.query(models.Rules).filter(models.Rules.Position == position).first()
 
     if rule_to_delete is None:
@@ -141,31 +123,59 @@ async def rule_delete_now(ctx: commands.Context, position: int):
         return
 
     session.delete(rule_to_delete)
-    current_position.SettingValue = int(current_position.SettingValue) - 1
+    change_current_position('-', 1)
     session.commit()
     print('Rule deleted')
     recalculate_positions()
     await show_regulations(ctx)
 
 
+def get_rules_action_channel():
+    rules_action_channel = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'RulesActionChannel').first()
+    return rules_action_channel.SettingValue
+
+
+def get_rules_channel():
+    rules_channel = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'RulesChannel').first()
+    return rules_channel.SettingValue
+
+
+def get_current_position():
+    current_position: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'CurrentRulePosition').first()
+    return current_position.SettingValue
+
+
+def change_current_position(operation: chr, value: int):
+    current_position: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'CurrentRulePosition').first()
+    if operation == '+':
+        current_position.SettingValue = int(current_position.SettingValue) + value
+    elif operation == '-':
+        current_position.SettingValue = int(current_position.SettingValue) - value
+    session.commit()
+
+
 def recalculate_positions():
     list_of_rules: list = session.query(models.Rules).all()
-    temp: int = 1
+    iterator: int = 1
     for elem in list_of_rules:
-        elem.Position = temp
-        temp += 1
+        elem.Position = iterator
+        iterator += 1
 
     current_position: models.Configuration = session.query(models.Configuration).filter(
         models.Configuration.SettingName == 'CurrentRulePosition').first()
-    current_position.SettingValue = temp
+    current_position.SettingValue = iterator
     session.commit()
 
 
 @bot.command(name='rshow', help='')
 async def show_regulations(ctx: commands.Context):
-    global rules_channel
+    rules_channel: str = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        print("Wrong channel")
+        await ctx.send("Wrong channel, use this command on " + rules_channel + " channel")
         return
 
     amount_of_fields_in_embed = 5
