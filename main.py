@@ -3,6 +3,7 @@ import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from datetime import date
 
 import db
 from sqlalchemy.orm import sessionmaker
@@ -76,6 +77,7 @@ async def rule_add(ctx: commands.Context, mess: str):
     action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
+    await ctx.send("Action is pending approval")
     print("Rule action added")
 
 
@@ -89,6 +91,7 @@ async def rule_delete(ctx: commands.Context, mess: str):
     action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
+    await ctx.send("Action is pending approval")
     print("Rule action added")
 
 
@@ -182,10 +185,13 @@ async def show_regulations(ctx: commands.Context):
     amount_of_rules_in_embed_field = 20
     await ctx.channel.purge(limit=10)
     list_of_rules: list = session.query(models.Rules).all()
+    today = date.today()
+    last_modification = today.strftime("%d/%m/%Y")
 
     position = 0
     while position < len(list_of_rules):
-        embed = discord.Embed(title="Regulamin")
+        embed_title: str = "Regulamin - " + last_modification
+        embed = discord.Embed(title=embed_title)
         for i in range(amount_of_fields_in_embed):
             if position >= len(list_of_rules):
                 break
