@@ -40,6 +40,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     mess_id: int = payload.message_id
     action: models.RulesActions = session.query(models.RulesActions).filter(
         models.RulesActions.MessageId == mess_id).first()
+    channel = bot.get_channel(payload.channel_id)
 
     if action.Action == "add":
         rule: models.Rules = models.Rules(action.Text, str(payload.member), get_current_position())
@@ -51,7 +52,6 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             rule_to_delete: models.Rules = session.query(models.Rules).filter(
                 models.Rules.Position == action.Text).first()
             if rule_to_delete is None:
-                channel = payload.channel_id
                 session.delete(action)
                 await channel.send('Wrong position')
                 return
@@ -60,11 +60,12 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             recalculate_positions()
         except:
             session.rollback()
-            channel = payload.channel_id
             await channel.send('Wrong position type')
 
     session.delete(action)
     session.commit()
+    rules_channel = discord.utils.get(bot.get_all_channels(), name=get_rules_channel())
+    await show_reg(rules_channel)
 
 
 @bot.command(name='radd', help='Adding new rule')
@@ -108,6 +109,7 @@ async def rule_add_now(ctx: commands.Context, mess: str):
     change_current_position('+', 1)
     session.commit()
     print("Rule added")
+    update_regulations_last_modification()
     await show_regulations(ctx)
 
 
@@ -129,6 +131,7 @@ async def rule_delete_now(ctx: commands.Context, position: int):
     change_current_position('-', 1)
     session.commit()
     print('Rule deleted')
+    update_regulations_last_modification()
     recalculate_positions()
     await show_regulations(ctx)
 
@@ -174,23 +177,35 @@ def recalculate_positions():
     session.commit()
 
 
+def update_regulations_last_modification():
+    today = date.today()
+    d1 = today.strftime("%d/%m/%Y")
+    r_last_modification: models.Configuration = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'RegulationsLastModification').first()
+    r_last_modification.SettingValue = d1
+    session.commit()
+
+
 @bot.command(name='rshow', help='')
 async def show_regulations(ctx: commands.Context):
     rules_channel: str = get_rules_channel()
     if rules_channel != ctx.channel.name:
         await ctx.send("Wrong channel, use this command on " + rules_channel + " channel")
         return
+    await show_reg(ctx.channel)
 
+
+async def show_reg(channel: discord.Message.channel):
     amount_of_fields_in_embed = 5
     amount_of_rules_in_embed_field = 20
-    await ctx.channel.purge(limit=10)
+    await channel.purge(limit=10)
     list_of_rules: list = session.query(models.Rules).all()
-    today = date.today()
-    last_modification = today.strftime("%d/%m/%Y")
+    regulations_last_modification: str = session.query(models.Configuration).filter(
+        models.Configuration.SettingName == 'RegulationsLastModification').first().SettingValue
 
     position = 0
     while position < len(list_of_rules):
-        embed_title: str = "Regulamin - " + last_modification
+        embed_title: str = "Regulamin - ostatnia zmiana " + regulations_last_modification
         embed = discord.Embed(title=embed_title)
         for i in range(amount_of_fields_in_embed):
             if position >= len(list_of_rules):
@@ -203,7 +218,7 @@ async def show_regulations(ctx: commands.Context):
                 text += str(elem.Position) + ". " + elem.Text + "\n"
                 position += 1
             embed.add_field(name='\u200b', value=text, inline=False)
-        await ctx.send(embed=embed)
+        await channel.send(embed=embed)
 
 
 bot.run(TOKEN)
