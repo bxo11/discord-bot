@@ -60,7 +60,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             recalculate_positions()
         except:
             session.rollback()
-            await channel.send('Zly format danych')
+            await channel.send('Zży format danych')
 
     session.delete(action)
     session.commit()
@@ -72,7 +72,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 async def rule_add(ctx: commands.Context, mess: str):
     rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        await ctx.send("Zly kanal, uzyj tej komendy na kanale " + "'" + rules_action_channel + "'")
+        await ctx.send("Zły kanał, użyj tej komendy na kanale " + "'" + rules_action_channel + "'")
         return
 
     action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
@@ -86,7 +86,7 @@ async def rule_add(ctx: commands.Context, mess: str):
 async def rule_delete(ctx: commands.Context, mess: str):
     rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        await ctx.send("Zly kanal, uzyj tej komendy na kanale " + "'" + rules_action_channel + "'")
+        await ctx.send("Zły kanał, użyj tej komendy na kanale " + "'" + rules_action_channel + "'")
         return
 
     action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
@@ -101,7 +101,7 @@ async def rule_delete(ctx: commands.Context, mess: str):
 async def rule_add_now(ctx: commands.Context, mess: str):
     rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zly kanal, uzyj tej komendy na kanale " + "'" + rules_channel + "'")
+        await ctx.send("Zły kanał, użyj tej komendy na kanale " + "'" + rules_channel + "'")
         return
 
     rule: models.Rules = models.Rules(mess, str(ctx.message.author), get_current_position())
@@ -118,7 +118,7 @@ async def rule_add_now(ctx: commands.Context, mess: str):
 async def rule_delete_now(ctx: commands.Context, position: int):
     rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zly kanal, uzyj tej komendy na kanale " + "'" + rules_channel + "'")
+        await ctx.send("Zły kanał, użyj tej komendy na kanale " + "'" + rules_channel + "'")
         return
 
     rule_to_delete: models.Rules = session.query(models.Rules).filter(models.Rules.Position == position).first()
@@ -190,7 +190,7 @@ def update_regulations_last_modification():
 async def show_regulations(ctx: commands.Context):
     rules_channel: str = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zly kanal, uzyj tej komendy na kanale " + "'" + rules_channel + "'")
+        await ctx.send("Zły kanał, użyj tej komendy na kanale " + "'" + rules_channel + "'")
         return
     await show_reg(ctx.channel)
 
@@ -205,8 +205,8 @@ async def show_reg(channel: discord.Message.channel):
 
     position = 0
     while position < len(list_of_rules):
-        embed_title: str = "Regulamin - ostatnia zmiana " + regulations_last_modification
-        embed = discord.Embed(title=embed_title)
+        embed_title: str = "Regulamin - ostatnia zmiana: " + regulations_last_modification
+        embed = discord.Embed(title=embed_title, color=0xff0000)
         for i in range(amount_of_fields_in_embed):
             if position >= len(list_of_rules):
                 break
@@ -224,8 +224,8 @@ async def show_reg(channel: discord.Message.channel):
 @bot.command(name='help')
 async def show_help(ctx: commands.Context):
     desc = get_rules_action_channel()
-    embed = discord.Embed(description="Komendy dzialaja tylko na " + "'" + desc + "'", color=0xff0000)
-    embed.add_field(name=".add", value="Dodaj punkt do regulaminu (np: **.add 'wojtek to gej'**)", inline=False)
+    embed = discord.Embed(description="Komendy działają tylko na " + "''" + desc + "''", color=0xff0000)
+    embed.add_field(name=".add", value="Dodaj punkt do regulaminu (np: **.add ''wojtek to gej''**)", inline=False)
     embed.add_field(name=".del", value="Usuń punkt z regulaminu (np: **.del 12**)", inline=False)
     embed.add_field(name=".adminadd", value="Natychmiast dodaj punkt (**tylko admin**)", inline=False)
     embed.add_field(name=".admindel", value="Natychmiast usuń punkt (**tylko admin**)", inline=False)
