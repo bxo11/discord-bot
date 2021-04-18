@@ -2,4 +2,4 @@ discord.py==1.7.1
 psycopg2==2.8.6
 PyNaCl==1.4.0
 python-dotenv==0.17.0
-SQLAlchemy==1.4.7
+SQLAlchemy==1.4.9
