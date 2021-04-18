@@ -4,7 +4,6 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from datetime import date
-
 import db
 from sqlalchemy.orm import sessionmaker
 
@@ -24,7 +23,6 @@ bot = commands.Bot(command_prefix='.', help_command=None)
 engine = db.load_database()
 Session = sessionmaker(bind=engine)
 session = Session()
-
 
 @bot.event
 async def on_ready():
@@ -60,10 +58,11 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             recalculate_positions()
         except:
             session.rollback()
-            await channel.send('Zży format danych')
+            await channel.send('Zły format danych')
 
     session.delete(action)
     session.commit()
+    update_regulations_last_modification()
     rules_channel = discord.utils.get(bot.get_all_channels(), name=get_rules_channel())
     await show_reg(rules_channel)
 
