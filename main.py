@@ -24,6 +24,7 @@ engine = db.load_database()
 Session = sessionmaker(bind=engine)
 session = Session()
 
+
 @bot.event
 async def on_ready():
     print('Logged in as:')
@@ -33,12 +34,14 @@ async def on_ready():
 
 @bot.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    if payload.member == bot.user:
+        return
     if not payload.member.guild_permissions.administrator:
         return
     mess_id: int = payload.message_id
     action: models.RulesActions = session.query(models.RulesActions).filter(
         models.RulesActions.MessageId == mess_id).first()
-    channel = bot.get_channel(payload.channel_id)
+    channel: discord.TextChannel = bot.get_channel(payload.channel_id)
 
     if action.Action == "add":
         rule: models.Rules = models.Rules(action.Text, str(payload.member), get_current_position())
@@ -63,6 +66,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     session.delete(action)
     session.commit()
     update_regulations_last_modification()
+    mess_obj: discord.PartialMessage = channel.get_partial_message(mess_id)
+    await mess_obj.clear_reactions()
+    await add_reaction_to_messeage(mess_obj, '✅')
     rules_channel = discord.utils.get(bot.get_all_channels(), name=get_rules_channel())
     await show_reg(rules_channel)
 
@@ -77,6 +83,7 @@ async def rule_add(ctx: commands.Context, mess: str):
     action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
+    await add_reaction_to_messeage(ctx.message, '🕖')
     await ctx.send("Akcja czeka na decyzje Ojca")
     print("Rule action added")
 
@@ -91,6 +98,7 @@ async def rule_delete(ctx: commands.Context, mess: str):
     action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
+    await add_reaction_to_messeage(ctx.message, '🕖')
     await ctx.send("Akcja czeka na decyzje Ojca")
     print("Rule action added")
 
@@ -133,6 +141,10 @@ async def rule_delete_now(ctx: commands.Context, position: int):
     update_regulations_last_modification()
     recalculate_positions()
     await show_regulations(ctx)
+
+
+async def add_reaction_to_messeage(msg: discord.Message, emoji_name: str):
+    await msg.add_reaction(emoji_name)
 
 
 def get_rules_action_channel():
