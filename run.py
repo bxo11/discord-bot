@@ -1,13 +1,12 @@
 import logging
 import os
-import discord
+
 from discord.ext import commands
 from dotenv import load_dotenv
-from datetime import date
-import db
 from sqlalchemy.orm import sessionmaker
-
-import models
+import db
+from methods import *
+import schedule
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -24,9 +23,18 @@ engine = db.load_database()
 Session = sessionmaker(bind=engine)
 session = Session()
 
+rules_action_channel: str
+rules_channel: str
+DISCORD_RULES_ACTION_CHANNEL_ERROR = f'Zły kanał, użyj tej komendy na odpowiednim kanale'
+DISCORD_RULES_CHANNEL_ERROR = f'Zły kanał, użyj tej komendy na odpowiednim kanale'
+DISCORD_ACTION_CONFIRMATION = f'Akcja czeka na decyzje Ojca'
+
 
 @bot.event
 async def on_ready():
+    global rules_channel, rules_action_channel
+    rules_action_channel = get_rules_action_channel(session)
+    rules_channel = get_rules_channel(session)
     print('Logged in as:')
     print('Username: ' + bot.user.name)
     print('------')
@@ -44,9 +52,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     channel: discord.TextChannel = bot.get_channel(payload.channel_id)
 
     if action.Action == "add":
-        rule: models.Rules = models.Rules(action.Text, str(action.Author), get_current_position())
+        rule: models.Rules = models.Rules(action.Text, str(action.Author), get_current_position(session))
         session.add(rule)
-        change_current_position('+', 1)
+        change_current_position(session, '+', 1)
 
     elif action.Action == "delete":
         try:
@@ -57,27 +65,26 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
                 await channel.send('Nie ma takiej pozycji')
                 return
             session.delete(rule_to_delete)
-            change_current_position('-', 1)
-            recalculate_positions()
+            change_current_position(session, '-', 1)
+            recalculate_positions(session)
         except Exception:
             session.rollback()
             await channel.send('Zły format danych')
 
     session.delete(action)
     session.commit()
-    update_regulations_last_modification()
+    update_regulations_last_modification(session)
     mess_obj: discord.PartialMessage = channel.get_partial_message(mess_id)
     await mess_obj.clear_reactions()
-    await add_reaction_to_message(mess_obj, '✅')
-    rules_channel = discord.utils.get(bot.get_all_channels(), name=get_rules_channel())
-    await show_reg(rules_channel)
+    await mess_obj.message.add_reaction('✅')
+    l_rules_channel = discord.utils.get(bot.get_all_channels(), name=get_rules_channel(session))
+    await show_reg(l_rules_channel)
 
 
 @bot.command(name='add')
 async def rule_add(ctx: commands.Context, mess: str, *args):
-    rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_action_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {rules_action_channel}')
         return
 
     if len(args) != 0:
@@ -87,53 +94,50 @@ async def rule_add(ctx: commands.Context, mess: str, *args):
     action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
-    await add_reaction_to_message(ctx.message, '🕖')
-    await ctx.send("Akcja czeka na decyzje Ojca")
+    await ctx.message.add_reaction('🕖')
+    await ctx.send(DISCORD_ACTION_CONFIRMATION)
     print("Rule action added")
 
 
 @bot.command(name='del')
 async def rule_delete(ctx: commands.Context, mess: str):
-    rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_action_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {rules_action_channel}')
         return
 
     action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
     session.add(action)
     session.commit()
-    await add_reaction_to_message(ctx.message, '🕖')
-    await ctx.send("Akcja czeka na decyzje Ojca")
+    await ctx.message.add_reaction('🕖')
+    await ctx.send(DISCORD_ACTION_CONFIRMATION)
     print("Rule action added")
 
 
 @bot.command(name='adminadd')
 @commands.has_permissions(administrator=True)
 async def rule_add_now(ctx: commands.Context, mess: str, *args):
-    rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {rules_channel}')
         return
 
     if len(args) != 0:
         for p in args:
             mess += " " + p
 
-    rule: models.Rules = models.Rules(mess, str(ctx.message.author), get_current_position())
+    rule: models.Rules = models.Rules(mess, str(ctx.message.author), get_current_position(session))
     session.add(rule)
-    change_current_position('+', 1)
+    change_current_position(session, '+', 1)
     session.commit()
     print("Rule added")
-    update_regulations_last_modification()
+    update_regulations_last_modification(session)
     await show_regulations(ctx)
 
 
 @bot.command(name='admindel')
 @commands.has_permissions(administrator=True)
 async def rule_delete_now(ctx: commands.Context, position: int):
-    rules_channel = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {rules_channel}')
         return
 
     rule_to_delete: models.Rules = session.query(models.Rules).filter(models.Rules.Position == position).first()
@@ -143,73 +147,18 @@ async def rule_delete_now(ctx: commands.Context, position: int):
         return
 
     session.delete(rule_to_delete)
-    change_current_position('-', 1)
+    change_current_position(session, '-', 1)
     session.commit()
     print('Rule deleted')
-    update_regulations_last_modification()
-    recalculate_positions()
+    update_regulations_last_modification(session)
+    recalculate_positions(session)
     await show_regulations(ctx)
-
-
-async def add_reaction_to_message(msg: discord.Message, emoji_name: str):
-    await msg.add_reaction(emoji_name)
-
-
-def get_rules_action_channel():
-    rules_action_channel = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'RulesActionChannel').first()
-    return rules_action_channel.SettingValue
-
-
-def get_rules_channel():
-    rules_channel = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'RulesChannel').first()
-    return rules_channel.SettingValue
-
-
-def get_current_position():
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
-    return current_position.SettingValue
-
-
-def change_current_position(operation: chr, value: int):
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
-    if operation == '+':
-        current_position.SettingValue = int(current_position.SettingValue) + value
-    elif operation == '-':
-        current_position.SettingValue = int(current_position.SettingValue) - value
-    session.commit()
-
-
-def recalculate_positions():
-    list_of_rules: list = session.query(models.Rules).all()
-    iterator: int = 1
-    for elem in list_of_rules:
-        elem.Position = iterator
-        iterator += 1
-
-    current_position: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'CurrentRulePosition').first()
-    current_position.SettingValue = iterator
-    session.commit()
-
-
-def update_regulations_last_modification():
-    today = date.today()
-    d1 = today.strftime("%d/%m/%Y")
-    r_last_modification: models.Configuration = session.query(models.Configuration).filter(
-        models.Configuration.SettingName == 'RegulationsLastModification').first()
-    r_last_modification.SettingValue = d1
-    session.commit()
 
 
 @bot.command(name='show')
 async def show_regulations(ctx: commands.Context):
-    rules_channel: str = get_rules_channel()
     if rules_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {rules_channel}')
         return
     await show_reg(ctx.channel)
 
@@ -224,8 +173,7 @@ async def show_reg(channel: discord.Message.channel):
 
     position = 0
     while position < len(list_of_rules):
-        embed_title: str = "Regulamin - ostatnia zmiana: " + regulations_last_modification
-        embed = discord.Embed(title=embed_title, color=0xff0000)
+        embed = discord.Embed(title=f'Regulamin - ostatnia zmiana: {regulations_last_modification}', color=0xff0000)
         for i in range(amount_of_fields_in_embed):
             if position >= len(list_of_rules):
                 break
@@ -234,7 +182,7 @@ async def show_reg(channel: discord.Message.channel):
                 if position >= len(list_of_rules):
                     break
                 elem: models.Rules = list_of_rules[position]
-                text += str(elem.Position) + ". " + elem.Text + "\n"
+                text += f'{elem.Position}. {elem.Text}\n'
                 position += 1
             embed.add_field(name='\u200b', value=text, inline=False)
         await channel.send(embed=embed)
@@ -242,9 +190,8 @@ async def show_reg(channel: discord.Message.channel):
 
 @bot.event
 async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
-    mess_id: int = payload.message_id
     action: models.RulesActions = session.query(models.RulesActions).filter(
-        models.RulesActions.MessageId == mess_id).first()
+        models.RulesActions.MessageId == payload.message_id).first()
 
     if action is not None:
         session.delete(action)
@@ -253,21 +200,19 @@ async def on_raw_message_delete(payload: discord.RawMessageDeleteEvent):
 
 @bot.command(name='help')
 async def show_help(ctx: commands.Context):
-    rules_action_channel = get_rules_action_channel()
     if rules_action_channel != ctx.channel.name:
-        await ctx.send("Zły kanał, użyj tej komendy na kanale " + '"' + rules_action_channel + '"')
+        await ctx.send(f'{DISCORD_RULES_ACTION_CHANNEL_ERROR}: "{rules_action_channel}"')
         return
 
-    desc = get_rules_action_channel()
-    embed = discord.Embed(description="Komendy działają tylko na " + '"' + desc + '"', color=0xff0000)
-    embed.add_field(name=".add", value='Dodaj punkt do regulaminu (np: **.add "wojtek to gej"**'
+    embed = discord.Embed(description=f'Komendy działają tylko na kanale: "{rules_action_channel}"', color=0xff0000)
+    embed.add_field(name=".add", value=f'Dodaj punkt do regulaminu (np: **.add "wojtek to gej"**'
                                        '\nlub **.add wojtek to gej**)', inline=False)
-    embed.add_field(name=".del", value="Usuń punkt z regulaminu (np: **.del 12**)", inline=False)
-    embed.add_field(name=".adminadd", value="Natychmiast dodaj punkt (**tylko admin**)", inline=False)
-    embed.add_field(name=".admindel", value="Natychmiast usuń punkt (**tylko admin**)", inline=False)
-    embed.add_field(name=".show", value="Pokaż regulamin", inline=True)
-    embed.add_field(name=".help", value="Pokaż komendy", inline=True)
-    embed.set_footer(text="Po dodaniu nowego punktu poczekaj aż Ojciec go zatwierdzi")
+    embed.add_field(name=".del", value=f"Usuń punkt z regulaminu (np: **.del 12**)", inline=False)
+    embed.add_field(name=".adminadd", value=f"Natychmiast dodaj punkt (**tylko admin**)", inline=False)
+    embed.add_field(name=".admindel", value=f"Natychmiast usuń punkt (**tylko admin**)", inline=False)
+    embed.add_field(name=".show", value=f"Pokaż regulamin", inline=True)
+    embed.add_field(name=".help", value=f"Pokaż komendy", inline=True)
+    embed.set_footer(text=f"Po dodaniu nowego punktu poczekaj aż Ojciec go zatwierdzi")
     await ctx.send(embed=embed)
 
 

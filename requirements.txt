@@ -3,3 +3,4 @@ psycopg2==2.8.6
 PyNaCl==1.4.0
 python-dotenv==0.17.0
 SQLAlchemy==1.4.9
+schedule==1.1.0
