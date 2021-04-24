@@ -19,25 +19,33 @@ logger.addHandler(handler)
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-bot = commands.Bot(command_prefix='.', help_command=None)
-
 initial_extensions = (
     'cogs.Regulation',
 )
 
-for extension in initial_extensions:
-    try:
-        bot.load_extension(extension)
-    except Exception as e:
-        print(f'Failed to load extension {extension}.', file=sys.stderr)
-        traceback.print_exc()
+
+class Regulaminson(commands.Bot):
+    def __init__(self, prefix):
+        self.bot_prefix = prefix
+        super().__init__(command_prefix=prefix, help_command=None)
+
+        for extension in initial_extensions:
+            try:
+                self.load_extension(extension)
+            except Exception as e:
+                print(f'Failed to load extension {extension}.', file=sys.stderr)
+                traceback.print_exc()
+
+    def run(self):
+        super().run(TOKEN, reconnect=True)
+
+    async def on_ready(self):
+        print('Logged in as:')
+        print('Username: ' + self.user.name)
+        print('------')
+        await self.change_presence(activity=discord.Game(name=f'{self.bot_prefix}help'))
 
 
-@bot.event
-async def on_ready():
-    print('Logged in as:')
-    print('Username: ' + bot.user.name)
-    print('------')
-
-
-bot.run(TOKEN)
+if __name__ == '__main__':
+    regulaminson = Regulaminson('.')
+    regulaminson.run()
