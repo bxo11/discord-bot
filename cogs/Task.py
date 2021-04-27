@@ -6,7 +6,6 @@ import discord
 import requests
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
 CONSTANT_POPE_TAGS = ['2137', 'jp2', 'jp2gmd']

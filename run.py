@@ -4,11 +4,9 @@ import sys
 import traceback
 
 import discord
-import schedule
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from cogs.Task import CONSTANT_FUN_CHANNEL
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
