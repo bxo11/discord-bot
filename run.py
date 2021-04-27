@@ -8,7 +8,7 @@ import schedule
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from cogs.Fun import DISCORD_FUN_CHANNEL
+from cogs.Task import CONSTANT_FUN_CHANNEL
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -21,6 +21,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 
 initial_extensions = (
     'cogs.Regulation',
+    'cogs.Task',
 )
 
 

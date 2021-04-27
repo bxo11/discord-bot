@@ -1,5 +1,5 @@
 from datetime import date
-
+import random
 import discord
 import sqlalchemy.exc
 from discord.ext import commands
@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from db import session
 import models
 
-DISCORD_RULES_ACTION_CHANNEL_ERROR = f'Zły kanał, użyj tej komendy na odpowiednim kanale'
-DISCORD_RULES_CHANNEL_ERROR = f'Zły kanał, użyj tej komendy na odpowiednim kanale'
-DISCORD_ACTION_CONFIRMATION = f'Akcja czeka na decyzje Ojca'
+CONSTANT_RULES_ACTION_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
+CONSTANT_RULES_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
+CONSTANT_ACTION_CONFIRMATION = ['Akcja czeka na decyzje Ojca']
 
 
 class Regulation(commands.Cog):
@@ -28,8 +28,9 @@ class Regulation(commands.Cog):
         if not payload.member.guild_permissions.administrator:
             return
         mess_id: int = payload.message_id
-        action: models.RulesActions = session.query(models.RulesActions).filter(
-            models.RulesActions.MessageId == mess_id).first()
+        action: models.RulesActions = session.query(models.RulesActions) \
+            .filter(models.RulesActions.MessageId == mess_id) \
+            .first()
         # valid msg check
         if action is None:
             return
@@ -45,8 +46,9 @@ class Regulation(commands.Cog):
         # deleting rule
         elif action.Action == "delete":
             try:
-                rule_to_delete: models.Rules = session.query(models.Rules).filter(
-                    models.Rules.Position == action.Text).first()
+                rule_to_delete: models.Rules = session.query(models.Rules) \
+                    .filter(models.Rules.Position == action.Text) \
+                    .first()
                 session.delete(rule_to_delete)
                 session.commit()
                 self.change_current_position(session, '-', 1)
@@ -66,8 +68,9 @@ class Regulation(commands.Cog):
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
-        action: models.RulesActions = session.query(models.RulesActions).filter(
-            models.RulesActions.MessageId == payload.message_id).first()
+        action: models.RulesActions = session.query(models.RulesActions) \
+            .filter(models.RulesActions.MessageId == payload.message_id) \
+            .first()
 
         if action is not None:
             session.delete(action)
@@ -76,7 +79,7 @@ class Regulation(commands.Cog):
     @commands.command(name='add')
     async def rule_add(self, ctx: commands.Context, mess: str, *args):
         if self.rules_action_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {self.rules_action_channel}')
+            await ctx.send(f'{CONSTANT_RULES_CHANNEL_ERROR}: {self.rules_action_channel}')
             return
 
         if len(args) != 0:
@@ -87,19 +90,20 @@ class Regulation(commands.Cog):
         session.add(action)
         session.commit()
         await ctx.message.add_reaction('🕖')
-        await ctx.send(DISCORD_ACTION_CONFIRMATION)
+        await ctx.send(random.choice(CONSTANT_ACTION_CONFIRMATION))
         print("Rule action added")
 
     @commands.command(name='del')
     async def rule_delete(self, ctx: commands.Context, mess: str):
         # channel check
         if self.rules_action_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {self.rules_action_channel}')
+            await ctx.send(f'{CONSTANT_RULES_CHANNEL_ERROR}: {self.rules_action_channel}')
             return
 
         try:
-            rule_to_delete: models.Rules = session.query(models.Rules).filter(
-                models.Rules.Position == mess).first()
+            rule_to_delete: models.Rules = session.query(models.Rules) \
+                .filter(models.Rules.Position == mess) \
+                .first()
             # valid position check
             if rule_to_delete is None:
                 await ctx.send('Nie ma takiej pozycji')
@@ -112,14 +116,14 @@ class Regulation(commands.Cog):
         session.add(action)
         session.commit()
         await ctx.message.add_reaction('🕖')
-        await ctx.send(DISCORD_ACTION_CONFIRMATION)
+        await ctx.send(random.choice(CONSTANT_ACTION_CONFIRMATION))
         print("Rule action added")
 
     @commands.command(name='adminadd')
     @commands.has_permissions(administrator=True)
     async def rule_add_now(self, ctx: commands.Context, mess: str, *args):
         if self.rules_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {self.rules_channel}')
+            await ctx.send(f'{CONSTANT_RULES_CHANNEL_ERROR}: {self.rules_channel}')
             return
 
         if len(args) != 0:
@@ -138,10 +142,12 @@ class Regulation(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def rule_delete_now(self, ctx: commands.Context, position: int):
         if self.rules_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {self.rules_channel}')
+            await ctx.send(f'{CONSTANT_RULES_CHANNEL_ERROR}: {self.rules_channel}')
             return
 
-        rule_to_delete: models.Rules = session.query(models.Rules).filter(models.Rules.Position == position).first()
+        rule_to_delete: models.Rules = session.query(models.Rules) \
+            .filter(models.Rules.Position == position) \
+            .first()
 
         if rule_to_delete is None:
             await ctx.send('Nie ma takiej pozycji')
@@ -158,7 +164,7 @@ class Regulation(commands.Cog):
     @commands.command(name='show')
     async def show_regulations(self, ctx: commands.Context):
         if self.rules_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_CHANNEL_ERROR}: {self.rules_channel}')
+            await ctx.send(f'{CONSTANT_RULES_CHANNEL_ERROR}: {self.rules_channel}')
             return
         await self.show_reg(ctx.channel)
 
@@ -168,8 +174,10 @@ class Regulation(commands.Cog):
         amount_of_rules_in_embed_field = 20
         await channel.purge(limit=10)
         list_of_rules: list = session.query(models.Rules).all()
-        regulations_last_modification: str = session.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'RegulationsLastModification').first().SettingValue
+        regulations_last_modification: str = session.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'RegulationsLastModification') \
+            .first() \
+            .SettingValue
 
         position = 0
         while position < len(list_of_rules):
@@ -190,7 +198,7 @@ class Regulation(commands.Cog):
     @commands.command(name='help')
     async def show_help(self, ctx: commands.Context):
         if self.rules_action_channel != ctx.channel.name:
-            await ctx.send(f'{DISCORD_RULES_ACTION_CHANNEL_ERROR}: "{self.rules_action_channel}"')
+            await ctx.send(f'{CONSTANT_RULES_ACTION_CHANNEL_ERROR}: "{self.rules_action_channel}"')
             return
 
         embed = discord.Embed(description=f'Komendy działają tylko na kanale: "{self.rules_action_channel}"',
@@ -209,33 +217,38 @@ class Regulation(commands.Cog):
     def update_regulations_last_modification(s: Session):
         today = date.today()
         d1 = today.strftime("%d/%m/%Y")
-        r_last_modification: models.Configuration = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'RegulationsLastModification').first()
+        r_last_modification: models.Configuration = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'RegulationsLastModification') \
+            .first()
         r_last_modification.SettingValue = d1
         s.commit()
 
     @staticmethod
     def get_rules_action_channel(s: Session):
-        l_rules_action_channel = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'RulesActionChannel').first()
+        l_rules_action_channel = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'RulesActionChannel') \
+            .first()
         return l_rules_action_channel.SettingValue
 
     @staticmethod
     def get_rules_channel(s: Session):
-        l_rules_channel = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'RulesChannel').first()
+        l_rules_channel = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'RulesChannel') \
+            .first()
         return l_rules_channel.SettingValue
 
     @staticmethod
     def get_current_position(s: Session):
-        current_position: models.Configuration = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'CurrentRulePosition').first()
+        current_position: models.Configuration = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'CurrentRulePosition') \
+            .first()
         return current_position.SettingValue
 
     @staticmethod
     def change_current_position(s: Session, operation: chr, value: int):
-        current_position: models.Configuration = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'CurrentRulePosition').first()
+        current_position: models.Configuration = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'CurrentRulePosition') \
+            .first()
         if operation == '+':
             current_position.SettingValue = int(current_position.SettingValue) + value
         elif operation == '-':
@@ -250,8 +263,9 @@ class Regulation(commands.Cog):
             elem.Position = iterator
             iterator += 1
 
-        current_position: models.Configuration = s.query(models.Configuration).filter(
-            models.Configuration.SettingName == 'CurrentRulePosition').first()
+        current_position: models.Configuration = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'CurrentRulePosition') \
+            .first()
         current_position.SettingValue = iterator
         s.commit()
 
