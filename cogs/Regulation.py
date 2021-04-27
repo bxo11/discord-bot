@@ -224,21 +224,21 @@ class Regulation(commands.Cog):
         s.commit()
 
     @staticmethod
-    def get_rules_action_channel(s: Session):
+    def get_rules_action_channel(s: Session) -> str:
         l_rules_action_channel = s.query(models.Configuration) \
             .filter(models.Configuration.SettingName == 'RulesActionChannel') \
             .first()
         return l_rules_action_channel.SettingValue
 
     @staticmethod
-    def get_rules_channel(s: Session):
+    def get_rules_channel(s: Session) -> str:
         l_rules_channel = s.query(models.Configuration) \
             .filter(models.Configuration.SettingName == 'RulesChannel') \
             .first()
         return l_rules_channel.SettingValue
 
     @staticmethod
-    def get_current_position(s: Session):
+    def get_current_position(s: Session) -> int:
         current_position: models.Configuration = s.query(models.Configuration) \
             .filter(models.Configuration.SettingName == 'CurrentRulePosition') \
             .first()

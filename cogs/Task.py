@@ -7,6 +7,11 @@ import requests
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+
+from db import session
+
+import models
 
 CONSTANT_POPE_TAGS = ['2137', 'jp2', 'jp2gmd']
 
@@ -21,6 +26,7 @@ class Task(commands.Cog):
         self.bot = bot
         self.async_sched = AsyncIOScheduler()
         self.guild = None
+        self.session = session
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -32,7 +38,7 @@ class Task(commands.Cog):
         self.async_sched.start()
 
     async def pope_reminder(self):
-        channel: discord.TextChannel = discord.utils.get(self.guild.channels, name="📝kanal-do-pisania")
+        channel: discord.TextChannel = discord.utils.get(self.guild.channels, name=Task.get_pope_channel(session))
         r = requests.get(
             "https://g.tenor.com/v1/search?key=%s&q=%s&limit=%s" % (KEY, random.choice(CONSTANT_POPE_TAGS), 25))
 
@@ -45,6 +51,13 @@ class Task(commands.Cog):
         embed = discord.Embed(colour=discord.Colour.blue())
         embed.set_image(url=data['results'][rand_index]['media'][0]['gif']['url'])
         await channel.send(embed=embed)
+
+    @staticmethod
+    def get_pope_channel(s: Session) -> str:
+        l_rules_action_channel = s.query(models.Configuration) \
+            .filter(models.Configuration.SettingName == 'PopeChannel') \
+            .first()
+        return l_rules_action_channel.SettingValue
 
 
 def setup(bot):
