@@ -2,6 +2,6 @@ discord.py==1.7.1
 psycopg2==2.8.6
 PyNaCl==1.4.0
 python-dotenv==0.17.0
-SQLAlchemy==1.4.9
+SQLAlchemy==1.4.11
 APScheduler==3.7.0
 requests==2.25.1
