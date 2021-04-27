@@ -7,6 +7,7 @@ import requests
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
+from pytz import utc
 from sqlalchemy.orm import Session
 
 from db import session
@@ -24,7 +25,7 @@ class Task(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.async_sched = AsyncIOScheduler()
+        self.async_sched = AsyncIOScheduler(timezone=utc)
         self.guild = None
         self.session = session
 
@@ -34,7 +35,7 @@ class Task(commands.Cog):
         self.start_all_schedules()
 
     def start_all_schedules(self):
-        self.async_sched.add_job(self.pope_reminder, 'cron', hour=21, minute=37)
+        self.async_sched.add_job(self.pope_reminder, 'cron', hour=19, minute=37)
         self.async_sched.start()
 
     async def pope_reminder(self):
