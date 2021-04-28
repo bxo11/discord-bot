@@ -173,7 +173,7 @@ class Regulation(commands.Cog):
         amount_of_fields_in_embed = 5
         amount_of_rules_in_embed_field = 20
         await channel.purge(limit=10)
-        list_of_rules: list = session.query(models.Rules).all()
+        list_of_rules: list = session.query(models.Rules).order_by(models.Rules.Id).all()
         regulations_last_modification: str = session.query(models.Configuration) \
             .filter(models.Configuration.SettingName == 'RegulationsLastModification') \
             .first() \
