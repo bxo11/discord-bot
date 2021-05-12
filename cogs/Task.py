@@ -35,7 +35,7 @@ class Task(commands.Cog):
         self.start_all_schedules()
 
     def start_all_schedules(self):
-        self.async_sched.add_job(self.pope_reminder, 'cron', hour=19, minute=37)
+        self.async_sched.add_job(self.pope_reminder, 'cron', day_of_week='fri,sat,sun', hour=19, minute=37)
         self.async_sched.start()
 
     async def pope_reminder(self):
