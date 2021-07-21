@@ -36,7 +36,7 @@ class Task(commands.Cog):
 
     def start_all_schedules(self):
         self.async_sched.add_job(self.pope_reminder, 'cron', day_of_week='fri,sat,sun', hour=19, minute=37)
-        self.async_sched.start()
+        #self.async_sched.start()
 
     async def pope_reminder(self):
         channel: discord.TextChannel = discord.utils.get(self.guild.channels, name=Task.get_pope_channel(session))
