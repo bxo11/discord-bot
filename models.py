@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum, func
 from sqlalchemy.orm import declarative_base, relationship
 
 from db import engine
@@ -12,7 +12,7 @@ class Guilds(Base):
     __tablename__ = 'guilds'
     id = Column(Integer, primary_key=True)
     guild_id = Column(BigInteger, nullable=False, unique=True)
-    date_time_added = Column(DateTime, default=datetime.utcnow, nullable=False)
+    date_time_added = Column(DateTime, default=datetime.utcnow)
     rules = relationship("Rules")
     rules_actions = relationship("RulesActions")
     configuration = relationship("Configuration")
@@ -24,10 +24,10 @@ class Guilds(Base):
 class Rules(Base):
     __tablename__ = 'rules'
     id = Column(Integer, primary_key=True)
-    text = Column(String(255), default='', nullable=False)
+    text = Column(String(255), default='')
     author = Column(String(50))
     position = Column(Integer, nullable=False)
-    date_time_added = Column(DateTime, default=datetime.utcnow, nullable=False)
+    date_time_added = Column(DateTime, default=datetime.utcnow)
     guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
 
     def __init__(self, text, author, position, guild_id):
@@ -43,12 +43,12 @@ class RulesActionsType(enum.Enum):
 
 
 class RulesActions(Base):
-    __tablename__ = 'rulesActions'
+    __tablename__ = 'rules_actions'
     id = Column(Integer, primary_key=True)
     message_id = Column(BigInteger, nullable=False)
     action = Column(Enum(RulesActionsType), nullable=False)
     author = Column(String(50))
-    text = Column(String(255), default='', nullable=False)
+    text = Column(String(255), default='')
     guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
 
     def __init__(self, message_id, action, author, text, guild_id):

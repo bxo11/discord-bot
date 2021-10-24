@@ -13,4 +13,3 @@ if DATABASE_URL.startswith("postgres://"):
 engine = create_engine(DATABASE_URL, echo=False)
 
 Session = sessionmaker(bind=engine)
-session = Session()
