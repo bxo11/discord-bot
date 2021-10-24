@@ -5,3 +5,4 @@ python-dotenv==0.19.1
 SQLAlchemy==1.4.26
 APScheduler==3.8.0
 requests==2.26.0
+pytz==2021.1

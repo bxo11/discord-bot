@@ -1,47 +1,84 @@
-from sqlalchemy import Column, String, INTEGER, DATETIME, VARCHAR, BIGINT
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.sql import func
+import enum
+from datetime import datetime
+from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum
+from sqlalchemy.orm import declarative_base, relationship
+
+from db import engine
 
 Base = declarative_base()
 
 
-class Rules(Base):
-    __tablename__ = 'Rules'
-    Id = Column('Id', INTEGER, primary_key=True)
-    Text = Column('Text', VARCHAR(100))
-    Author = Column('Author', VARCHAR(50))
-    Position = Column('Position', INTEGER)
-    DateAdded = Column('DateAdded', DATETIME, default=func.now())
+class Guilds(Base):
+    __tablename__ = 'guilds'
+    id = Column(Integer, primary_key=True)
+    guild_id = Column(BigInteger, nullable=False, unique=True)
+    date_time_added = Column(DateTime, default=datetime.utcnow, nullable=False)
+    rules = relationship("Rules")
+    rules_actions = relationship("RulesActions")
+    configuration = relationship("Configuration")
 
-    def __init__(self, text, author, position):
-        self.Text = text
-        self.Author = author
-        self.Position = position
+    def __init__(self, guild_id):
+        self.guild_d = guild_id
+
+
+class Rules(Base):
+    __tablename__ = 'rules'
+    id = Column(Integer, primary_key=True)
+    text = Column(String(255), default='', nullable=False)
+    author = Column(String(50))
+    position = Column(Integer, nullable=False)
+    date_time_added = Column(DateTime, default=datetime.utcnow, nullable=False)
+    guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
+
+    def __init__(self, text, author, position, guild_id):
+        self.text = text
+        self.author = author
+        self.position = position
+        self.guild_id = guild_id
+
+
+class RulesActionsType(enum.Enum):
+    add = 'add'
+    delete = 'delete'
+
 
 class RulesActions(Base):
-    __tablename__ = 'RulesActions'
-    Id = Column('Id', INTEGER, primary_key=True)
-    MessageId = Column('MessageId', BIGINT, nullable=False)
-    Action = Column('Action', VARCHAR(50), nullable=False)
-    Author = Column('Author', VARCHAR(50))
-    Text = Column('Text', VARCHAR(100))
+    __tablename__ = 'rulesActions'
+    id = Column(Integer, primary_key=True)
+    message_id = Column(BigInteger, nullable=False)
+    action = Column(Enum(RulesActionsType), nullable=False)
+    author = Column(String(50))
+    text = Column(String(255), default='', nullable=False)
+    guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
+
+    def __init__(self, message_id, action, author, text, guild_id):
+        self.message_id = message_id
+        self.action = action
+        self.author = author
+        self.text = text
+        self.guild_id = guild_id
 
 
-    def __init__(self, mid, a, aut, t):
-        self.MessageId = mid
-        self.Action = a
-        self.Author = aut
-        self.Text = t
+class ConfigurationSectionType(enum.Enum):
+    other = "other"
+    regulation = 'regulation'
+    tasks = 'tasks'
+
 
 class Configuration(Base):
-    __tablename__ = 'Configuration'
-    SectionName = Column('SectionName', VARCHAR(50))
-    SettingName = Column('SettingName', VARCHAR(50), primary_key=True)
-    SettingValue = Column('SettingValue', VARCHAR(1000))
-    SettingType = Column('SettingType', INTEGER)
+    __tablename__ = 'configuration'
+    id = Column(Integer, primary_key=True)
+    section_name = Column(Enum(ConfigurationSectionType), nullable=False)
+    setting_name = Column(String(50), nullable=False, unique=True)
+    setting_value = Column(String(50), nullable=False)
+    guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
 
-    def __init__(self, sec_n, set_n, set_v, set_t):
-        self.SectionName = sec_n
-        self.SettingName = set_n
-        self.SettingValue = set_v
-        self.SettingType = set_t
+    def __init__(self, section_name, setting_name, setting_value, guild_id):
+        self.section_name = section_name
+        self.setting_name = setting_name
+        self.setting_value = setting_value
+        self.guild_id = guild_id
+
+
+if __name__ == '__main__':
+    Base.metadata.create_all(engine)

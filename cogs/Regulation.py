@@ -6,6 +6,7 @@ from discord.ext import commands
 from sqlalchemy.orm import Session
 from db import session
 import models
+from run import GUILD_ID
 
 CONSTANT_RULES_ACTION_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
 CONSTANT_RULES_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
@@ -39,7 +40,7 @@ class Regulation(commands.Cog):
 
         # adding rule
         if action.Action == "add":
-            rule: models.Rules = models.Rules(action.Text, str(action.Author), self.get_current_position(session))
+            rule: models.Rules = models.Rules(action.Text, str(action.Author), self.get_current_position(session), GUILD_ID)
             session.add(rule)
             self.change_current_position(session, '+', 1)
 
@@ -86,7 +87,7 @@ class Regulation(commands.Cog):
             for p in args:
                 mess += " " + p
 
-        action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess)
+        action: models.RulesActions = models.RulesActions(ctx.message.id, "add", str(ctx.message.author), mess, GUILD_ID)
         session.add(action)
         session.commit()
         await ctx.message.add_reaction('🕖')
@@ -112,7 +113,7 @@ class Regulation(commands.Cog):
             await ctx.send('Zły format danych')
             return
 
-        action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess)
+        action: models.RulesActions = models.RulesActions(ctx.message.id, "delete", str(ctx.message.author), mess, GUILD_ID)
         session.add(action)
         session.commit()
         await ctx.message.add_reaction('🕖')
@@ -130,7 +131,7 @@ class Regulation(commands.Cog):
             for p in args:
                 mess += " " + p
 
-        rule: models.Rules = models.Rules(mess, str(ctx.message.author), self.get_current_position(session))
+        rule: models.Rules = models.Rules(mess, str(ctx.message.author), self.get_current_position(session), GUILD_ID)
         session.add(rule)
         session.commit()
         self.change_current_position(session, '+', 1)
