@@ -26,14 +26,12 @@ class Rules(Base):
     id = Column(Integer, primary_key=True)
     text = Column(String(255), default='')
     author = Column(String(50))
-    position = Column(Integer, nullable=False)
     date_time_added = Column(DateTime, default=datetime.utcnow)
     guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
 
-    def __init__(self, text, author, position, guild_id):
+    def __init__(self, text, author, guild_id):
         self.text = text
         self.author = author
-        self.position = position
         self.guild_id = guild_id
 
 
@@ -69,7 +67,7 @@ class Configuration(Base):
     __tablename__ = 'configuration'
     id = Column(Integer, primary_key=True)
     section_name = Column(Enum(ConfigurationSectionType), nullable=False)
-    setting_name = Column(String(50), nullable=False, unique=True)
+    setting_name = Column(String(50), nullable=False)
     setting_value = Column(String(50), nullable=False)
     guild_id = Column(BigInteger, ForeignKey('guilds.id'), nullable=False)
 
