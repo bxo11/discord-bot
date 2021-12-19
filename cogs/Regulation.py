@@ -3,14 +3,14 @@ from datetime import date
 from time import sleep
 
 import discord
-from discord import DiscordException
 from discord.ext import commands
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from typing import Union
 
 from db import Session
-from models import Guilds, Configuration, Rules, RulesActions, RulesActionsType
+from models import Guilds, Configuration, Rules, RulesActions, RulesActionsType, ConfigurationType
 
 CONSTANT_RULES_ACTION_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
 CONSTANT_RULES_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
@@ -24,10 +24,9 @@ class Regulation(commands.Cog):
         self.bot = bot
 
     @commands.Cog.listener()
+    @commands.has_permissions(administrator=True)
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         if payload.member == self.bot.user:
-            return
-        if not payload.member.guild_permissions.administrator:
             return
 
         with Session() as session, session.begin():
@@ -44,7 +43,8 @@ class Regulation(commands.Cog):
 
                 # add action
                 if action.action == RulesActionsType.add:
-                    rule: Rules = Rules(action.text, action.author, session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
+                    rule: Rules = Rules(action.text, action.author,
+                                        session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
                     session.add(rule)
 
                 # delete action
@@ -55,14 +55,15 @@ class Regulation(commands.Cog):
                 session.delete(action)
                 self.update_regulations_last_modification(guild_id)
                 message_object: discord.PartialMessage = channel.get_partial_message(message_id)
+                l_rules_channel = discord.utils.get(self.bot.get_all_channels(),
+                                                    id=self.get_setting(guild_id, 'RulesChannel'))
                 await message_object.clear_reactions()
                 await message_object.add_reaction('✅')
-                l_rules_channel = discord.utils.get(self.bot.get_all_channels(),
-                                                    name=self.get_setting(guild_id, 'RulesChannel'))
-                await self.print_regulation(l_rules_channel)
             except Exception as error:
                 print(error)
                 session.rollback()
+                return
+        await self.print_regulation(l_rules_channel)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
@@ -77,13 +78,14 @@ class Regulation(commands.Cog):
             except SQLAlchemyError as error:
                 session.rollback()
                 print(error)
+                return
 
     @commands.command(name='add')
     async def rule_action_add(self, ctx: commands.Context, message: str, *args):
         guild_id = ctx.guild.id
-        rules_action_channel = self.get_setting(guild_id, 'RulesActionChannel')
-        if not ctx.channel.name == rules_action_channel:
-            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}: {rules_action_channel}'
+        rules_action_channel_id = self.get_setting(guild_id, 'RulesActionChannel')
+        if not ctx.channel.id == rules_action_channel_id:
+            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}'
             await ctx.send(error_message)
             raise Exception(error_message)
 
@@ -104,18 +106,19 @@ class Regulation(commands.Cog):
             except SQLAlchemyError as error:
                 print(error)
                 session.rollback()
+                return
 
     @commands.command(name='del')
     async def rule_action_delete(self, ctx: commands.Context, position: str):
         guild_id = ctx.guild.id
-        rules_action_channel = self.get_setting(guild_id, 'RulesActionChannel')
+        rules_action_channel_id = self.get_setting(guild_id, 'RulesActionChannel')
 
         if not position.isnumeric():
             error_message = f'{CONSTANT_RULES_CHANNEL_TYPE_ERROR}'
             await ctx.send(error_message)
             return
-        if not ctx.channel.name == rules_action_channel:
-            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}: {rules_action_channel}'
+        if not ctx.channel.id == rules_action_channel_id:
+            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}'
             await ctx.send(error_message)
             return
         rule_to_delete = self.get_rule_by_position(guild_id, int(position))
@@ -137,15 +140,16 @@ class Regulation(commands.Cog):
             except SQLAlchemyError as error:
                 print(error)
                 session.rollback()
+                return
 
     @commands.command(name='adminadd')
     @commands.has_permissions(administrator=True)
     async def rule_add_now(self, ctx: commands.Context, message: str, *args):
         guild_id = ctx.guild.id
-        rules_channel = self.get_setting(guild_id, 'RulesChannel')
+        rules_channel_id = self.get_setting(guild_id, 'RulesChannel')
 
-        if not ctx.channel.name == rules_channel:
-            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}: "{rules_channel}"'
+        if not ctx.channel.id == rules_channel_id:
+            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}'
             await ctx.send(error_message)
             return
 
@@ -160,23 +164,24 @@ class Regulation(commands.Cog):
                 session.add(rule)
                 print("Rule added")
                 self.update_regulations_last_modification(guild_id)
-                await self.show_regulations(ctx)
             except SQLAlchemyError as error:
                 print(error)
                 session.rollback()
+                return
+        await self.show_regulations(ctx)
 
     @commands.command(name='admindel')
     @commands.has_permissions(administrator=True)
     async def rule_delete_now(self, ctx: commands.Context, position: str):
         guild_id = ctx.guild.id
-        rules_channel = self.get_setting(guild_id, 'RulesChannel')
+        rules_channel_id = self.get_setting(guild_id, 'RulesChannel')
 
         if not position.isnumeric():
             error_message = f'{CONSTANT_RULES_CHANNEL_TYPE_ERROR}'
             await ctx.send(error_message)
             return
-        if not ctx.channel.name == rules_channel:
-            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}: "{rules_channel}"'
+        if not ctx.channel.id == rules_channel_id:
+            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}'
             await ctx.send(error_message)
             return
         rule_to_delete = self.get_rule_by_position(guild_id, int(position))
@@ -190,10 +195,11 @@ class Regulation(commands.Cog):
                 session.delete(rule_to_delete)
                 print('Rule deleted')
                 self.update_regulations_last_modification(guild_id)
-                await self.show_regulations(ctx)
             except SQLAlchemyError as error:
                 print(error)
                 session.rollback()
+                return
+        await self.show_regulations(ctx)
 
     def get_rule_by_position(self, guild_id: int, position: int) -> Rules or None:
         with Session() as session, session.begin():
@@ -204,10 +210,10 @@ class Regulation(commands.Cog):
 
     @commands.command(name='show')
     async def show_regulations(self, ctx: commands.Context):
-        rules_channel = self.get_setting(ctx.guild.id, 'RulesChannel')
+        rules_channel_id = self.get_setting(ctx.guild.id, 'RulesChannel')
 
-        if not ctx.channel.name == rules_channel:
-            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}: "{rules_channel}"'
+        if not ctx.channel.id == rules_channel_id:
+            error_message = f'{CONSTANT_RULES_CHANNEL_ERROR}'
             await ctx.send(error_message)
             return
 
@@ -246,18 +252,19 @@ class Regulation(commands.Cog):
                     await ctx.send(embed=embed)
             except SQLAlchemyError as error:
                 print(error)
+                return
 
     @commands.command(name='help')
     async def show_help(self, ctx: commands.Context):
-        rules_action_channel = self.get_setting(ctx.guild.id, 'RulesActionChannel')
+        rules_action_channel_id = self.get_setting(ctx.guild.id, 'RulesActionChannel')
 
-        if not ctx.channel.name == rules_action_channel:
-            error_message = f'{CONSTANT_RULES_ACTION_CHANNEL_ERROR}: "{rules_action_channel}"'
+        if not ctx.channel.id == rules_action_channel_id:
+            error_message = f'{CONSTANT_RULES_ACTION_CHANNEL_ERROR}'
             await ctx.send(error_message)
             return
 
         # embed body
-        embed = discord.Embed(description=f'Komendy działają tylko na kanale: "{rules_action_channel}"',
+        embed = discord.Embed(description=f'Komendy działają tylko na określonym kanale.',
                               color=0xff0000)
         embed.add_field(name=".add", value=f'Dodaj punkt do regulaminu (np: **.add "wojtek to gej"**'
                                            '\nlub **.add wojtek to gej**)', inline=False)
@@ -274,14 +281,23 @@ class Regulation(commands.Cog):
         dat = today.strftime("%d/%m/%Y")
         self.set_setting(guild_id, 'RegulationsLastModification', dat)
 
-    def get_setting(self, guild_id: int, setting_name: str) -> str:
+    def get_setting(self, guild_id: int, setting_name: str) -> Union[int, str, None]:
         return_value = None
         with Session() as session, session.begin():
             try:
                 setting: Configuration = session.query(Configuration).join(Guilds).filter(
                     and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
                 return_value = setting.setting_value
+                if setting.type == ConfigurationType.int:
+                    return_value = int(return_value)
+                elif setting.type == ConfigurationType.string:
+                    pass
+                elif setting.type == ConfigurationType.date:
+                    pass
             except SQLAlchemyError as error:
+                print(error)
+                session.rollback()
+            except Exception as error:
                 print(error)
                 session.rollback()
             finally:

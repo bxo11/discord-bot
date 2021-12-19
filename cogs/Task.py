@@ -17,7 +17,6 @@ CONSTANT_POPE_TAGS = ['2137', 'jp2', 'jp2gmd']
 
 load_dotenv()
 KEY = os.getenv('TENOR_KEY')
-GUILD_ID = os.getenv('GUILD_ID')
 
 
 class Task(commands.Cog):
