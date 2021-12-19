@@ -288,11 +288,11 @@ class Regulation(commands.Cog):
                 setting: Configuration = session.query(Configuration).join(Guilds).filter(
                     and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
                 return_value = setting.setting_value
-                if setting.type == ConfigurationType.int:
+                if setting.setting_type == ConfigurationType.int:
                     return_value = int(return_value)
-                elif setting.type == ConfigurationType.string:
+                elif setting.setting_type == ConfigurationType.string:
                     pass
-                elif setting.type == ConfigurationType.date:
+                elif setting.setting_type == ConfigurationType.date:
                     pass
             except SQLAlchemyError as error:
                 print(error)
