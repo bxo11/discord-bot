@@ -1,4 +1,4 @@
-discord.py==1.7.3
+git+https://github.com/Rapptz/discord.py@master#egg=discord.py
 PyNaCl==1.4.0
 python-dotenv==0.19.2
 SQLAlchemy==1.4.28

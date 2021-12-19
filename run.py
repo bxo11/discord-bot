@@ -8,7 +8,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 # logging
-from db import Session
 from models import fill_empty_configuration, remove_guild
 
 logger = logging.getLogger('discord')
