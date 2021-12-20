@@ -8,7 +8,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 # logging
-from models import fill_empty_configuration, remove_guild
+from models import new_guild_and_default_config, remove_guild
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -41,7 +41,7 @@ class Regulaminson(commands.Bot):
         super().run(TOKEN, reconnect=True)
 
     async def on_guild_join(self, guild):
-        fill_empty_configuration(guild.id)
+        new_guild_and_default_config(guild.id)
 
     async def on_guild_remove(self, guild):
         remove_guild(guild.id)

@@ -1,6 +1,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, relationship
 
 from db import engine, Session
@@ -83,23 +84,32 @@ default_config_list = [('date', 'RegulationsLastModification'),
                        ('int', 'RulesActionChannel')]
 
 
-def fill_empty_configuration(guild_id):
-    with Session() as session, session.begin():
-        new_guild = Guilds(guild_id)
-        session.add(new_guild)
+def new_guild_and_default_config(guild_id):
+    try:
+        with Session() as session, session.begin():
+            new_guild = Guilds(guild_id)
+            session.add(new_guild)
 
-    with Session() as session, session.begin():
-        new_guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
-        for s in default_config_list:
-            setting: Configuration = Configuration(setting_type=s[0], setting_name=s[1], setting_value='',
-                                                   guild_id=new_guild.id)
-            session.add(setting)
+        with Session() as session, session.begin():
+            new_guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
+            for s in default_config_list:
+                setting: Configuration = Configuration(setting_type=s[0], setting_name=s[1], setting_value='',
+                                                       guild_id=new_guild.id)
+                session.add(setting)
+    except SQLAlchemyError as error:
+        print(error)
+        return
 
 
 def remove_guild(guild_id):
     with Session() as session, session.begin():
-        guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
-        session.delete(guild)
+        try:
+            guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
+            if guild:
+                session.delete(guild)
+        except SQLAlchemyError as error:
+            print(error)
+            return
 
 
 # run this file to create empty database
