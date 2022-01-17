@@ -256,16 +256,10 @@ class Regulation(commands.Cog):
 
     @commands.command(name='help')
     async def show_help(self, ctx: commands.Context):
-        rules_action_channel_id = self.get_setting(ctx.guild.id, 'RulesActionChannel')
-
-        if not ctx.channel.id == rules_action_channel_id:
-            error_message = f'{CONSTANT_RULES_ACTION_CHANNEL_ERROR}'
-            await ctx.send(error_message)
-            return
-
         # embed body
         embed = discord.Embed(description=f'Komendy działają tylko na określonym kanale.',
                               color=0xff0000)
+        embed.add_field(name=".setup", value=f'Podstawowa konfiguracja bota \n(np: **.setup id-rules-channel id-rules-action-channel**)', inline=False)
         embed.add_field(name=".add", value=f'Dodaj punkt do regulaminu (np: **.add "wojtek to gej"**'
                                            '\nlub **.add wojtek to gej**)', inline=False)
         embed.add_field(name=".del", value=f"Usuń punkt z regulaminu (np: **.del 12**)", inline=False)
@@ -275,6 +269,12 @@ class Regulation(commands.Cog):
         embed.add_field(name=".help", value=f"Pokaż komendy", inline=True)
         embed.set_footer(text=f"Po dodaniu nowego punktu poczekaj aż Ojciec go zatwierdzi")
         await ctx.send(embed=embed)
+
+    @commands.command(name='setup')
+    async def setup(self, ctx: commands.Context, rules_channel_id: str, action_channel_id: str):
+        if rules_channel_id.isnumeric() and action_channel_id.isnumeric():
+            self.set_setting(ctx.guild.id, "RulesChannel", rules_channel_id)
+            self.set_setting(ctx.guild.id, "RulesActionChannel", action_channel_id)
 
     def update_regulations_last_modification(self, guild_id: int):
         today = date.today()

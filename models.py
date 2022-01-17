@@ -14,9 +14,9 @@ class Guilds(Base):
     id = Column(Integer, primary_key=True)
     guild_id = Column(Integer, nullable=False, unique=True)
     datetime_added = Column(DateTime, default=datetime.utcnow)
-    rules = relationship("Rules", cascade="all,delete", backref="parent")
-    rules_actions = relationship("RulesActions", cascade="all,delete", backref="parent")
-    configuration = relationship("Configuration", cascade="all,delete", backref="parent")
+    rules = relationship("Rules", cascade="all,delete")
+    rules_actions = relationship("RulesActions", cascade="all,delete")
+    configuration = relationship("Configuration", cascade="all,delete")
 
     def __init__(self, guild_id):
         self.guild_id = guild_id
