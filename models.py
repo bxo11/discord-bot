@@ -68,8 +68,8 @@ class Configuration(Base):
     __tablename__ = 'configuration'
     id = Column(Integer, primary_key=True)
     setting_type = Column(Enum(ConfigurationType), nullable=False)
-    setting_name = Column(String(50), nullable=False)
-    setting_value = Column(String(50), default='')
+    setting_name = Column(String(255), nullable=False)
+    setting_value = Column(String(255), default='')
     guild_id = Column(Integer, ForeignKey('guilds.id'), nullable=False)
 
     def __init__(self, setting_type, setting_name, setting_value, guild_id):

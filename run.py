@@ -44,7 +44,8 @@ class Regulaminson(commands.Bot):
         new_guild_and_default_config(guild.id)
 
     async def on_guild_remove(self, guild):
-        remove_guild(guild.id)
+        # remove_guild(guild.id)
+        pass
 
     async def on_ready(self):
         print('Logged in as:')
