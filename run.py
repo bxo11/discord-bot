@@ -7,6 +7,8 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
+# logging
+from models import new_guild_and_default_config, remove_guild
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -37,6 +39,13 @@ class Regulaminson(commands.Bot):
 
     def run(self):
         super().run(TOKEN, reconnect=True)
+
+    async def on_guild_join(self, guild):
+        new_guild_and_default_config(guild.id)
+
+    async def on_guild_remove(self, guild):
+        # remove_guild(guild.id)
+        pass
 
     async def on_ready(self):
         print('Logged in as:')
