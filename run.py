@@ -18,24 +18,33 @@ logger.addHandler(handler)
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
+MY_GUILD = os.getenv('MY_GUILD')
 
 initial_extensions = (
     'cogs.Regulation',
-    'cogs.Task',
 )
 
 
 class Regulaminson(commands.Bot):
     def __init__(self, prefix):
         self.bot_prefix = prefix
-        super().__init__(command_prefix=prefix, help_command=None)
+        super().__init__(command_prefix=prefix, help_command=None, intents=discord.Intents.all())
 
+    async def startup(self):
+        await self.wait_until_ready()
+        await self.tree.sync(guild=discord.Object(
+            id=MY_GUILD))  # If you want to define specific guilds, pass a discord object with id (Currently, this is global)
+        print('Sucessfully synced applications commands')
+        print(f'Connected as {self.user}')
+
+    async def setup_hook(self):
         for extension in initial_extensions:
             try:
-                self.load_extension(extension)
+                await self.load_extension(extension)
             except Exception as e:
                 print(f'Failed to load extension {extension}.', file=sys.stderr)
                 traceback.print_exc()
+        self.loop.create_task(self.startup())
 
     def run(self):
         super().run(TOKEN, reconnect=True)

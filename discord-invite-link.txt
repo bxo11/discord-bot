@@ -1,5 +1,0 @@
-regulaminson:
-https://discord.com/api/oauth2/authorize?client_id=831184287352094760&permissions=3355962432&scope=bot
-
-dev:
-https://discord.com/api/oauth2/authorize?client_id=831833120583581697&permissions=3355962432&scope=bot

@@ -3,9 +3,9 @@ from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, relationship
-
+from typing import Union
 from db import engine, Session
-
+from sqlalchemy import and_
 Base = declarative_base()
 
 
@@ -110,6 +110,40 @@ def remove_guild(guild_id):
         except SQLAlchemyError as error:
             print(error)
             return
+
+
+def get_setting(guild_id: int, setting_name: str) -> Union[int, str, None]:
+    return_value = None
+    with Session() as session, session.begin():
+        try:
+            setting: Configuration = session.query(Configuration).join(Guilds).filter(
+                and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
+            return_value = setting.setting_value
+            if setting.setting_type == ConfigurationType.int:
+                return_value = int(return_value)
+            elif setting.setting_type == ConfigurationType.string:
+                pass
+            elif setting.setting_type == ConfigurationType.date:
+                pass
+        except SQLAlchemyError as error:
+            print(error)
+            session.rollback()
+        except Exception as error:
+            print(error)
+            session.rollback()
+        finally:
+            return return_value
+
+
+def set_setting(guild_id: int, setting_name: str, new_value: str):
+    with Session() as session, session.begin():
+        try:
+            setting: Configuration = session.query(Configuration).join(Guilds).filter(
+                and_(Guilds.guild_id == guild_id), Configuration.setting_name == setting_name).first()
+            setting.setting_value = new_value
+        except SQLAlchemyError as error:
+            print(error)
+            session.rollback()
 
 
 # run this file to create empty database
