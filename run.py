@@ -60,7 +60,7 @@ class Regulaminson(commands.Bot):
         print('Logged in as:')
         print('Username: ' + self.user.name)
         print('------')
-        await self.change_presence(activity=discord.Game(name=f'{self.bot_prefix}help'))
+        await self.change_presence(activity=discord.Game(name='ruling'))
 
 
 if __name__ == '__main__':

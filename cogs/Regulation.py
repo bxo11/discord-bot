@@ -1,7 +1,6 @@
 import random
 from datetime import date
 from time import sleep
-from typing import Union
 
 import discord
 from discord import app_commands
@@ -11,14 +10,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from db import Session
-from models import Guilds, Configuration, Rules, RulesActions, RulesActionsType, ConfigurationType, get_setting, \
+from models import Guilds, Rules, RulesActions, RulesActionsType, get_setting, \
     set_setting
 from run import MY_GUILD
 
-CONSTANT_RULES_ACTION_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
-CONSTANT_RULES_CHANNEL_ERROR = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
-CONSTANT_RULES_CHANNEL_TYPE_ERROR = 'Zły typ argumentu'
-CONSTANT_ACTION_CONFIRMATION = ['Akcja czeka na decyzje Ojca']
+ERROR_WRONG_CHANNEL = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
+ERROR_WRONG_INDEX = 'Nie ma takiej pozycji'
+CONFIRMATION_REPLY_LIST = ['Akcja czeka na decyzje Ojca']
+REGULATION_DESCRIPTION = 'Regulamin - ostatnia zmiana'
+CONSTANT_NEW_RULE = 'Nowa zasada'
+CONSTANT_DELETE_RULE = 'Usun zasade'
+CONSTANT_SUCCESS = 'OK'
 
 
 class Regulation(commands.Cog):
@@ -57,9 +59,14 @@ class Regulation(commands.Cog):
 
                 session.delete(action)
                 Regulation.update_regulations_last_modification(discord.Object(id=guild_id))
-                message_object: discord.PartialMessage = channel.get_partial_message(message_id)
+                message_object: discord.Message = await channel.get_partial_message(message_id).fetch()
                 l_rules_channel = discord.utils.get(self.bot.get_all_channels(),
                                                     id=get_setting(guild_id, 'RulesChannel'))
+                # colour set
+                current_embed = message_object.embeds[0]
+                current_embed.colour = 0x00FF00
+                await message_object.edit(embed=current_embed)
+                # reaction set
                 await message_object.clear_reactions()
                 await message_object.add_reaction('✅')
             except Exception as error:
@@ -77,7 +84,6 @@ class Regulation(commands.Cog):
 
                 if action:
                     session.delete(action)
-                    print('Action deleted')
             except SQLAlchemyError as error:
                 session.rollback()
                 print(error)
@@ -107,7 +113,7 @@ class Regulation(commands.Cog):
 
                 position = 0
                 while position < len(rules):
-                    embed = discord.Embed(title=f'Regulamin - ostatnia zmiana: {regulations_last_modification}',
+                    embed = discord.Embed(title=f'{REGULATION_DESCRIPTION}: {regulations_last_modification}',
                                           color=0xff0000)
                     for i in range(amount_of_fields_in_embed):
                         if position < len(rules):
@@ -134,7 +140,8 @@ class Regulation(commands.Cog):
         set_setting(guild.id, 'RegulationsLastModification', dat)
 
     @staticmethod
-    async def create_confirmation_embed(channel: discord.TextChannel, title: str, rule: str, author: discord.User) -> discord.Message:
+    async def create_confirmation_embed(channel: discord.TextChannel, title: str, rule: str,
+                                        author: discord.User) -> discord.Message:
         embed = discord.Embed(title=title, color=0xff0000)
         embed.add_field(name='\u200b', value=f'"{rule}" by {author}', inline=False)
         sent_message = await channel.send(embed=embed)
@@ -148,11 +155,11 @@ class RulesGroup(app_commands.Group):
         rules_channel_id = get_setting(interaction.guild_id, 'RulesChannel')
 
         if not interaction.channel_id == rules_channel_id:
-            await interaction.response.send_message(CONSTANT_RULES_CHANNEL_ERROR, ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
 
         await Regulation.print_regulation(interaction.channel)
-        await interaction.response.send_message('Success!')
+        await interaction.response.send_message(CONSTANT_SUCCESS)
 
     @app_commands.command(name='admin-add', description='Add rule')
     @commands.has_permissions(administrator=True)
@@ -161,7 +168,7 @@ class RulesGroup(app_commands.Group):
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
 
         if not interaction.channel_id == rules_channel_id:
-            await interaction.response.send_message(CONSTANT_RULES_CHANNEL_ERROR, ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
 
         with Session() as session, session.begin():
@@ -175,7 +182,7 @@ class RulesGroup(app_commands.Group):
                 print(error)
                 session.rollback()
                 return
-        await interaction.response.send_message('Success!', ephemeral=True)
+        await interaction.response.send_message(CONSTANT_SUCCESS, ephemeral=True)
         await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='admin-del', description='Remove rule')
@@ -185,11 +192,11 @@ class RulesGroup(app_commands.Group):
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
 
         if not interaction.channel_id == rules_channel_id:
-            await interaction.response.send_message(CONSTANT_RULES_CHANNEL_ERROR, ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
         rule_to_delete = Regulation.get_rule_by_position(guild_id, int(position))
         if not rule_to_delete:
-            await interaction.response.send_message('Nie ma takiej pozycji', ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_INDEX, ephemeral=True)
             return
 
         with Session() as session, session.begin():
@@ -201,7 +208,7 @@ class RulesGroup(app_commands.Group):
                 print(error)
                 session.rollback()
                 return
-        await interaction.response.send_message('Success!', ephemeral=True)
+        await interaction.response.send_message(CONSTANT_SUCCESS, ephemeral=True)
         await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='add', description='Add new rule proposition')
@@ -210,11 +217,12 @@ class RulesGroup(app_commands.Group):
         rules_action_channel_id = get_setting(guild_id, 'RulesActionChannel')
 
         if not interaction.channel_id == rules_action_channel_id:
-            await interaction.response.send_message(CONSTANT_RULES_CHANNEL_ERROR, ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
 
-        await interaction.response.send_message(random.choice(CONSTANT_ACTION_CONFIRMATION), ephemeral=True)
-        sent_message = await Regulation.create_confirmation_embed(interaction.channel, 'New rule', message, interaction.user)
+        await interaction.response.send_message(random.choice(CONFIRMATION_REPLY_LIST), ephemeral=True)
+        sent_message = await Regulation.create_confirmation_embed(interaction.channel, CONSTANT_NEW_RULE, message,
+                                                                  interaction.user)
         await sent_message.add_reaction('🕖')
 
         with Session() as session, session.begin():
@@ -236,15 +244,15 @@ class RulesGroup(app_commands.Group):
         rules_action_channel_id = get_setting(guild_id, 'RulesActionChannel')
 
         if not interaction.channel_id == rules_action_channel_id:
-            await interaction.response.send_message(CONSTANT_RULES_CHANNEL_ERROR, ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
         rule_to_delete = Regulation.get_rule_by_position(guild_id, int(position))
         if not rule_to_delete:
-            await interaction.response.send_message('Nie ma takiej pozycji', ephemeral=True)
+            await interaction.response.send_message(ERROR_WRONG_INDEX, ephemeral=True)
             return
 
-        await interaction.response.send_message(random.choice(CONSTANT_ACTION_CONFIRMATION), ephemeral=True)
-        sent_message = await Regulation.create_confirmation_embed(interaction.channel, 'Delete rule', position,
+        await interaction.response.send_message(random.choice(CONFIRMATION_REPLY_LIST), ephemeral=True)
+        sent_message = await Regulation.create_confirmation_embed(interaction.channel, CONSTANT_DELETE_RULE, position,
                                                                   interaction.user)
         await sent_message.add_reaction('🕖')
 
@@ -269,7 +277,7 @@ class RulesGroup(app_commands.Group):
                     action_channel: discord.TextChannel):
         set_setting(interaction.guild_id, "RulesChannel", str(rules_channel.id))
         set_setting(interaction.guild_id, "RulesActionChannel", str(action_channel.id))
-        await interaction.response.send_message('Success!', ephemeral=True)
+        await interaction.response.send_message(CONSTANT_SUCCESS, ephemeral=True)
 
 
 async def setup(bot):
