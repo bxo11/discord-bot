@@ -12,7 +12,7 @@ Base = declarative_base()
 class Guilds(Base):
     __tablename__ = 'guilds'
     id = Column(Integer, primary_key=True)
-    guild_id = Column(Integer, nullable=False, unique=True)
+    guild_id = Column(BigInteger, nullable=False, unique=True)
     datetime_added = Column(DateTime, default=datetime.utcnow)
     rules = relationship("Rules", cascade="all,delete")
     rules_actions = relationship("RulesActions", cascade="all,delete")
