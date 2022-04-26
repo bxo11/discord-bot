@@ -1,61 +1,43 @@
-import json
-import os
-import random
-
-import discord
-import requests
-from discord.ext import commands
+import discord.utils
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from discord.ext import commands
 from dotenv import load_dotenv
 from pytz import utc
-from sqlalchemy.orm import Session
-
-
-import models
-
-CONSTANT_TAGS = []
+from sqlalchemy.exc import SQLAlchemyError
+from db import Session
+from models import Guilds
 
 load_dotenv()
-KEY = os.getenv('TENOR_KEY')
 
 
 class Task(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.async_sched = AsyncIOScheduler(timezone=utc)
+        self.async_scheduler = AsyncIOScheduler(timezone=utc)
 
-    # @commands.Cog.listener()
-    # async def on_ready(self):
-    #     self.guild = self.bot.get_guild(int(GUILD_ID))
-    #     self.start_all_schedules()
-    #
-    # def start_all_schedules(self):
-    #     self.async_sched.add_job(self.pope_reminder, 'cron', day_of_week='fri,sat,sun', hour=19, minute=37)
-    #     #self.async_sched.start()
-    #
-    # async def pop_reminder(self):
-    #     channel: discord.TextChannel = discord.utils.get(self.guild.channels, name=Task.get_pop_channel(session))
-    #     r = requests.get(
-    #         "https://g.tenor.com/v1/search?key=%s&q=%s&limit=%s" % (KEY, random.choice(CONSTANT_POP_TAGS), 25))
-    #
-    #     if r.status_code == 200:
-    #         data = json.loads(r.content)
-    #     else:
-    #         data = ''
-    #
-    #     rand_index = random.randint(0, 24)
-    #     embed = discord.Embed(colour=discord.Colour.blue())
-    #     embed.set_image(url=data['results'][rand_index]['media'][0]['gif']['url'])
-    #     await channel.send(embed=embed)
-    #
-    # @staticmethod
-    # def get_pop_channel(s: Session) -> str:
-    #     l_rules_action_channel = s.query(models.Configuration) \
-    #         .filter(models.Configuration.SettingName == 'PopChannel') \
-    #         .first()
-    #     return l_rules_action_channel.SettingValue
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self.start_all_schedules()
+        self.example()
+
+    def start_all_schedules(self):
+        self.async_scheduler.add_job(self.async_example, 'cron', hour=19, minute=37)
+        self.async_scheduler.start()
+
+    def example(self):
+        with Session() as session, session.begin():
+            try:
+                guilds: list = session.query(Guilds).order_by(Guilds.id).all()
+                for guild in guilds:
+                    pass
+            except SQLAlchemyError as error:
+                print(error)
+                return
+
+    async def async_example(self):
+        pass
 
 
-def setup(bot):
-    bot.add_cog(Task(bot))
+async def setup(bot):
+    await bot.add_cog(Task(bot))

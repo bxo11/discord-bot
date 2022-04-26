@@ -7,7 +7,6 @@ from discord import app_commands
 from discord.ext import commands
 from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 from db import Session
 from models import Guilds, Rules, RulesActions, RulesActionsType, get_setting, \
