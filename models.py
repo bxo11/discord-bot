@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, DateTime, BigInteger, ForeignKey, Enum
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import declarative_base, relationship
 from typing import Union
 from db import engine, Session
@@ -85,65 +85,49 @@ default_config_list = [('date', 'RegulationsLastModification'),
 
 
 def new_guild_and_default_config(guild_id):
-    try:
-        with Session() as session, session.begin():
+    with Session() as session, session.begin():
+        try:
             new_guild = Guilds(guild_id)
             session.add(new_guild)
+        except IntegrityError:
+            return
 
-        with Session() as session, session.begin():
-            new_guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
-            for s in default_config_list:
-                setting: Configuration = Configuration(setting_type=s[0], setting_name=s[1], setting_value='',
-                                                       guild_id=new_guild.id)
-                session.add(setting)
-    except SQLAlchemyError as error:
-        print(error)
-        return
+    with Session() as session, session.begin():
+        new_guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
+        for s in default_config_list:
+            setting: Configuration = Configuration(setting_type=s[0], setting_name=s[1], setting_value='',
+                                                   guild_id=new_guild.id)
+            session.add(setting)
 
 
 def remove_guild(guild_id):
     with Session() as session, session.begin():
-        try:
-            guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
-            if guild:
-                session.delete(guild)
-        except SQLAlchemyError as error:
-            print(error)
-            return
+        guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
+        if guild:
+            session.delete(guild)
 
 
 def get_setting(guild_id: int, setting_name: str) -> Union[int, str, None]:
     return_value = None
     with Session() as session, session.begin():
-        try:
-            setting: Configuration = session.query(Configuration).join(Guilds).filter(
-                and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
-            return_value = setting.setting_value
-            if setting.setting_type == ConfigurationType.int:
-                return_value = int(return_value)
-            elif setting.setting_type == ConfigurationType.string:
-                pass
-            elif setting.setting_type == ConfigurationType.date:
-                pass
-        except SQLAlchemyError as error:
-            print(error)
-            session.rollback()
-        except Exception as error:
-            print(error)
-            session.rollback()
-        finally:
-            return return_value
+        setting: Configuration = session.query(Configuration).join(Guilds).filter(
+            and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
+        return_value = setting.setting_value
+        if setting.setting_type == ConfigurationType.int:
+            return_value = int(return_value)
+        elif setting.setting_type == ConfigurationType.string:
+            pass
+        elif setting.setting_type == ConfigurationType.date:
+            pass
+
+        return return_value
 
 
 def set_setting(guild_id: int, setting_name: str, new_value: str):
     with Session() as session, session.begin():
-        try:
-            setting: Configuration = session.query(Configuration).join(Guilds).filter(
-                and_(Guilds.guild_id == guild_id), Configuration.setting_name == setting_name).first()
-            setting.setting_value = new_value
-        except SQLAlchemyError as error:
-            print(error)
-            session.rollback()
+        setting: Configuration = session.query(Configuration).join(Guilds).filter(
+            and_(Guilds.guild_id == guild_id), Configuration.setting_name == setting_name).first()
+        setting.setting_value = new_value
 
 
 # run this file to create empty database

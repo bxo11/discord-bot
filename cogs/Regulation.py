@@ -34,59 +34,49 @@ class Regulation(commands.Cog):
             return
 
         with Session() as session, session.begin():
-            try:
-                message_id: int = payload.message_id
-                guild_id = payload.guild_id
-                action: RulesActions = session.query(RulesActions).join(Guilds).filter(
-                    and_(Guilds.guild_id == guild_id, RulesActions.message_id == message_id)).first()
+            message_id: int = payload.message_id
+            guild_id = payload.guild_id
+            action: RulesActions = session.query(RulesActions).join(Guilds).filter(
+                and_(Guilds.guild_id == guild_id, RulesActions.message_id == message_id)).first()
 
-                if not action:
-                    return
-
-                channel: discord.TextChannel = self.bot.get_channel(payload.channel_id)
-
-                # add action
-                if action.action == RulesActionsType.add:
-                    rule: Rules = Rules(action.text, action.author,
-                                        session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
-                    session.add(rule)
-
-                # delete action
-                elif action.action == RulesActionsType.delete:
-                    rule_to_delete = self.get_rule_by_position(guild_id, action.text)
-                    session.delete(rule_to_delete)
-
-                session.delete(action)
-                Regulation.update_regulations_last_modification(discord.Object(id=guild_id))
-                message_object: discord.Message = await channel.get_partial_message(message_id).fetch()
-                l_rules_channel = discord.utils.get(self.bot.get_all_channels(),
-                                                    id=get_setting(guild_id, 'RulesChannel'))
-                # colour set
-                current_embed = message_object.embeds[0]
-                current_embed.colour = 0x00FF00
-                await message_object.edit(embed=current_embed)
-                # reaction set
-                await message_object.clear_reactions()
-                await message_object.add_reaction('✅')
-            except Exception as error:
-                print(error)
-                session.rollback()
+            if not action:
                 return
+
+            channel: discord.TextChannel = self.bot.get_channel(payload.channel_id)
+
+            # add action
+            if action.action == RulesActionsType.add:
+                rule: Rules = Rules(action.text, action.author,
+                                    session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
+                session.add(rule)
+
+            # delete action
+            elif action.action == RulesActionsType.delete:
+                rule_to_delete = self.get_rule_by_position(guild_id, action.text)
+                session.delete(rule_to_delete)
+
+            session.delete(action)
+            Regulation.update_regulations_last_modification(discord.Object(id=guild_id))
+            message_object: discord.Message = await channel.get_partial_message(message_id).fetch()
+            l_rules_channel = discord.utils.get(self.bot.get_all_channels(),
+                                                id=get_setting(guild_id, 'RulesChannel'))
+            # colour set
+            current_embed = message_object.embeds[0]
+            current_embed.colour = 0x00FF00
+            await message_object.edit(embed=current_embed)
+            # reaction set
+            await message_object.clear_reactions()
+            await message_object.add_reaction('✅')
         await Regulation.print_regulation(l_rules_channel)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         with Session() as session, session.begin():
-            try:
-                action: RulesActions = session.query(RulesActions).filter(
-                    RulesActions.message_id == payload.message_id).first()
+            action: RulesActions = session.query(RulesActions).filter(
+                RulesActions.message_id == payload.message_id).first()
 
-                if action:
-                    session.delete(action)
-            except SQLAlchemyError as error:
-                session.rollback()
-                print(error)
-                return
+            if action:
+                session.delete(action)
 
     @staticmethod
     def get_rule_by_position(guild_id: int, position: int) -> Rules or None:
@@ -102,35 +92,31 @@ class Regulation(commands.Cog):
         amount_of_rules_in_embed_field = 20
 
         with Session() as session, session.begin():
-            try:
-                guild_id = ctx.guild.id
-                await ctx.purge(limit=10)
-                sleep(1)
-                rules: list = session.query(Rules).join(Guilds).filter(Guilds.guild_id == guild_id).order_by(
-                    Rules.id).all()
-                regulations_last_modification: str = get_setting(guild_id, 'RegulationsLastModification')
+            guild_id = ctx.guild.id
+            await ctx.purge(limit=10)
+            sleep(1)
+            rules: list = session.query(Rules).join(Guilds).filter(Guilds.guild_id == guild_id).order_by(
+                Rules.id).all()
+            regulations_last_modification: str = get_setting(guild_id, 'RegulationsLastModification')
 
-                position = 0
-                while position < len(rules):
-                    embed = discord.Embed(title=f'{REGULATION_DESCRIPTION}: {regulations_last_modification}',
-                                          color=0xff0000)
-                    for i in range(amount_of_fields_in_embed):
-                        if position < len(rules):
-                            text = ""
-                            for j in range(amount_of_rules_in_embed_field):
-                                if position < len(rules):
-                                    rule: Rules = rules[position]
-                                    text += f'{position + 1}. {rule.text}\n'
-                                    position += 1
-                                else:
-                                    break
-                            embed.add_field(name='\u200b', value=text, inline=False)
-                        else:
-                            break
-                    await ctx.send(embed=embed)
-            except SQLAlchemyError as error:
-                print(error)
-                return
+            position = 0
+            while position < len(rules):
+                embed = discord.Embed(title=f'{REGULATION_DESCRIPTION}: {regulations_last_modification}',
+                                      color=0xff0000)
+                for i in range(amount_of_fields_in_embed):
+                    if position < len(rules):
+                        text = ""
+                        for j in range(amount_of_rules_in_embed_field):
+                            if position < len(rules):
+                                rule: Rules = rules[position]
+                                text += f'{position + 1}. {rule.text}\n'
+                                position += 1
+                            else:
+                                break
+                        embed.add_field(name='\u200b', value=text, inline=False)
+                    else:
+                        break
+                await ctx.send(embed=embed)
 
     @staticmethod
     def update_regulations_last_modification(guild: discord.Guild):
@@ -161,7 +147,7 @@ class RulesGroup(app_commands.Group):
         await interaction.response.send_message(CONSTANT_SUCCESS)
 
     @app_commands.command(name='admin-add', description='Add rule')
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def rule_add_now(self, interaction: discord.Interaction, message: str):
         guild_id = interaction.guild_id
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
@@ -171,21 +157,17 @@ class RulesGroup(app_commands.Group):
             return
 
         with Session() as session, session.begin():
-            try:
-                rule: Rules = Rules(message, str(interaction.user),
-                                    session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
-                session.add(rule)
-                print("Rule added")
-                Regulation.update_regulations_last_modification(interaction.guild)
-            except SQLAlchemyError as error:
-                print(error)
-                session.rollback()
-                return
+            rule: Rules = Rules(message, str(interaction.user),
+                                session.query(Guilds).filter(Guilds.guild_id == guild_id).first().id)
+            session.add(rule)
+            print("Rule added")
+            Regulation.update_regulations_last_modification(interaction.guild)
+
         await interaction.response.send_message(CONSTANT_SUCCESS, ephemeral=True)
         await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='admin-del', description='Remove rule')
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def rule_delete_now(self, interaction: discord.Interaction, position: int):
         guild_id = interaction.guild.id
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
@@ -199,14 +181,10 @@ class RulesGroup(app_commands.Group):
             return
 
         with Session() as session, session.begin():
-            try:
-                session.delete(rule_to_delete)
-                print('Rule deleted')
-                Regulation.update_regulations_last_modification(interaction.guild)
-            except SQLAlchemyError as error:
-                print(error)
-                session.rollback()
-                return
+            session.delete(rule_to_delete)
+            print('Rule deleted')
+            Regulation.update_regulations_last_modification(interaction.guild)
+
         await interaction.response.send_message(CONSTANT_SUCCESS, ephemeral=True)
         await Regulation.print_regulation(interaction.channel)
 
@@ -225,17 +203,12 @@ class RulesGroup(app_commands.Group):
         await sent_message.add_reaction('🕖')
 
         with Session() as session, session.begin():
-            try:
-                action: RulesActions = RulesActions(sent_message.id, RulesActionsType.add,
-                                                    str(interaction.user),
-                                                    message,
-                                                    session.query(Guilds).filter(
-                                                        Guilds.guild_id == guild_id).first().id)
-                session.add(action)
-            except SQLAlchemyError as error:
-                print(error)
-                session.rollback()
-                return
+            action: RulesActions = RulesActions(sent_message.id, RulesActionsType.add,
+                                                str(interaction.user),
+                                                message,
+                                                session.query(Guilds).filter(
+                                                    Guilds.guild_id == guild_id).first().id)
+            session.add(action)
 
     @app_commands.command(name='delete', description='Add delete proposition')
     async def rule_action_delete(self, interaction: discord.Interaction, position: int):
@@ -256,22 +229,17 @@ class RulesGroup(app_commands.Group):
         await sent_message.add_reaction('🕖')
 
         with Session() as session, session.begin():
-            try:
-                action: RulesActions = RulesActions(sent_message.id, RulesActionsType.delete,
-                                                    str(interaction.user),
-                                                    position,
-                                                    session.query(Guilds).filter(
-                                                        Guilds.guild_id == guild_id).first().id)
-                session.add(action)
-            except SQLAlchemyError as error:
-                print(error)
-                session.rollback()
-                return
+            action: RulesActions = RulesActions(sent_message.id, RulesActionsType.delete,
+                                                str(interaction.user),
+                                                position,
+                                                session.query(Guilds).filter(
+                                                    Guilds.guild_id == guild_id).first().id)
+            session.add(action)
 
     @app_commands.command(name='setup', description='set the RulesChannel and RulesActionChannel')
     @app_commands.describe(rules_channel='Text channel to show regulation',
                            action_channel='Text channel for sending actions to modify regulation')
-    @commands.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, rules_channel: discord.TextChannel,
                     action_channel: discord.TextChannel):
         set_setting(interaction.guild_id, "RulesChannel", str(rules_channel.id))
