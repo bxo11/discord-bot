@@ -22,6 +22,7 @@ MY_GUILD = os.getenv('MY_GUILD')
 
 initial_extensions = (
     'cogs.Regulation',
+
 )
 
 

@@ -19,21 +19,22 @@ class Task(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         self.start_all_schedules()
-        self.example()
+        await self.example()
 
     def start_all_schedules(self):
         self.async_scheduler.add_job(self.async_example, 'cron', hour=19, minute=37)
         self.async_scheduler.start()
 
-    def example(self):
+    async def example(self):
         with Session() as session, session.begin():
-            try:
-                guilds: list = session.query(Guilds).order_by(Guilds.id).all()
-                for guild in guilds:
-                    pass
-            except SQLAlchemyError as error:
-                print(error)
-                return
+            # guilds = session.query(Guilds).order_by(Guilds.id).all()
+            for guild in self.bot.guilds:
+                for voice_channel in guild.voice_channels:
+                    if len(voice_channel.members):
+                        voice_client = await voice_channel.connect()
+                        # audio = discord.FFmpegOpusAudio('aaa.wav')
+                        # voice_client.play(audio)
+                        await voice_client.disconnect()
 
     async def async_example(self):
         pass
