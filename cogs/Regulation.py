@@ -6,11 +6,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from sqlalchemy import and_
-from sqlalchemy.exc import SQLAlchemyError
 
 from db import Session
 from models import Guilds, Rules, RulesActions, RulesActionsType, get_setting, \
-    set_setting
+    set_setting, update_default_config
 from run import MY_GUILD
 
 ERROR_WRONG_CHANNEL = 'Zły kanał, użyj tej komendy na odpowiednim kanale'
@@ -80,7 +79,7 @@ class Regulation(commands.Cog):
 
     @staticmethod
     def get_rule_by_position(guild_id: int, position: int) -> Rules or None:
-        with Session() as session, session.begin():
+        with Session(expire_on_commit=False) as session, session.begin():
             rules: list = session.query(Rules).join(Guilds).filter(Guilds.guild_id == guild_id).order_by(Rules.id).all()
             if int(position) < 1 or int(position) > len(rules):
                 return None
@@ -136,6 +135,7 @@ class Regulation(commands.Cog):
 class RulesGroup(app_commands.Group):
 
     @app_commands.command(name='show', description='Show rules')
+    @app_commands.guild_only
     async def show_regulations(self, interaction: discord.Interaction):
         rules_channel_id = get_setting(interaction.guild_id, 'RulesChannel')
 
@@ -143,11 +143,13 @@ class RulesGroup(app_commands.Group):
             await interaction.response.send_message(ERROR_WRONG_CHANNEL, ephemeral=True)
             return
 
-        await Regulation.print_regulation(interaction.channel)
         await interaction.response.send_message(CONSTANT_SUCCESS)
+        await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='admin-add', description='Add rule')
+    @app_commands.describe(message='Content of rule')
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.guild_only
     async def rule_add_now(self, interaction: discord.Interaction, message: str):
         guild_id = interaction.guild_id
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
@@ -167,7 +169,9 @@ class RulesGroup(app_commands.Group):
         await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='admin-del', description='Remove rule')
+    @app_commands.describe(position='Numerical position of rule')
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.guild_only
     async def rule_delete_now(self, interaction: discord.Interaction, position: int):
         guild_id = interaction.guild.id
         rules_channel_id = get_setting(guild_id, 'RulesChannel')
@@ -189,6 +193,8 @@ class RulesGroup(app_commands.Group):
         await Regulation.print_regulation(interaction.channel)
 
     @app_commands.command(name='add', description='Add new rule proposition')
+    @app_commands.describe(message='Content of rule')
+    @app_commands.guild_only
     async def rule_action_add(self, interaction: discord.Interaction, message: str):
         guild_id = interaction.guild_id
         rules_action_channel_id = get_setting(guild_id, 'RulesActionChannel')
@@ -211,6 +217,8 @@ class RulesGroup(app_commands.Group):
             session.add(action)
 
     @app_commands.command(name='delete', description='Add delete proposition')
+    @app_commands.describe(position='Numerical position of rule')
+    @app_commands.guild_only
     async def rule_action_delete(self, interaction: discord.Interaction, position: int):
         guild_id = interaction.guild_id
         rules_action_channel_id = get_setting(guild_id, 'RulesActionChannel')
@@ -224,7 +232,7 @@ class RulesGroup(app_commands.Group):
             return
 
         await interaction.response.send_message(random.choice(CONFIRMATION_REPLY_LIST), ephemeral=True)
-        sent_message = await Regulation.create_confirmation_embed(interaction.channel, CONSTANT_DELETE_RULE, position,
+        sent_message = await Regulation.create_confirmation_embed(interaction.channel, CONSTANT_DELETE_RULE, f'{position}. {rule_to_delete.text}',
                                                                   interaction.user)
         await sent_message.add_reaction('🕖')
 
@@ -240,6 +248,7 @@ class RulesGroup(app_commands.Group):
     @app_commands.describe(rules_channel='Text channel to show regulation',
                            action_channel='Text channel for sending actions to modify regulation')
     @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.guild_only
     async def setup(self, interaction: discord.Interaction, rules_channel: discord.TextChannel,
                     action_channel: discord.TextChannel):
         set_setting(interaction.guild_id, "RulesChannel", str(rules_channel.id))
@@ -248,5 +257,8 @@ class RulesGroup(app_commands.Group):
 
 
 async def setup(bot):
-    bot.tree.add_command(RulesGroup(), guild=discord.Object(id=MY_GUILD))
+    if MY_GUILD:
+        bot.tree.add_command(RulesGroup(), guild=discord.Object(id=MY_GUILD))
+    else:
+        bot.tree.add_command(RulesGroup())
     await bot.add_cog(Regulation(bot))

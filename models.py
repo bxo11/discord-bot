@@ -6,6 +6,7 @@ from sqlalchemy.orm import declarative_base, relationship
 from typing import Union
 from db import engine, Session
 from sqlalchemy import and_
+
 Base = declarative_base()
 
 
@@ -84,7 +85,7 @@ default_config_list = [('date', 'RegulationsLastModification'),
                        ('int', 'RulesActionChannel')]
 
 
-def new_guild_and_default_config(guild_id):
+def add_new_guild(guild_id):
     with Session() as session, session.begin():
         try:
             new_guild = Guilds(guild_id)
@@ -92,12 +93,23 @@ def new_guild_and_default_config(guild_id):
         except IntegrityError:
             return
 
+
+def update_default_config(guild_id):
+    # create default config in database for guild if not exist (based on default_config_list)
     with Session() as session, session.begin():
         new_guild = session.query(Guilds).filter(Guilds.guild_id == guild_id).first()
-        for s in default_config_list:
-            setting: Configuration = Configuration(setting_type=s[0], setting_name=s[1], setting_value='',
-                                                   guild_id=new_guild.id)
-            session.add(setting)
+        guild_config_list = session.query(Configuration).filter(Configuration.guild_id == new_guild.id).all()
+        for single_config in default_config_list:
+            exist = False
+            for guild_config in guild_config_list:
+                if single_config[1] == guild_config.setting_name:
+                    exist = True
+                    break
+            if not exist:
+                setting: Configuration = Configuration(setting_type=single_config[0], setting_name=single_config[1],
+                                                       setting_value='',
+                                                       guild_id=new_guild.id)
+                session.add(setting)
 
 
 def remove_guild(guild_id):
@@ -108,7 +120,6 @@ def remove_guild(guild_id):
 
 
 def get_setting(guild_id: int, setting_name: str) -> Union[int, str, None]:
-    return_value = None
     with Session() as session, session.begin():
         setting: Configuration = session.query(Configuration).join(Guilds).filter(
             and_(Guilds.guild_id == guild_id, Configuration.setting_name == setting_name)).first()
